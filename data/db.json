@@ -1,0 +1,36 @@
+{
+  "reservations": {},
+  "pushSubscriptions": [
+    {
+      "userId": "114217770653670149976",
+      "subscription": {
+        "endpoint": "https://fcm.googleapis.com/fcm/send/clHqUPiFbEw:APA91bEbu3ckTOCS4S6J9Da-MLtqIaOvOnejdDAaYoHL-EO26-5KhCqH3QmoZ5h8xPM2SYVQtrWSNMYH0zpiOAgH5YmNiTj5pD1cuIQlxPr3b0zIvmUQjcwFj5VD5CXZXHcJ7YHHq_QM",
+        "expirationTime": null,
+        "keys": {
+          "p256dh": "BN1EFf8dY1GZ7UvP2S4oypnOlXZAUnLTuN2z9SHmXw7mkQi6j2--s6eAPUDN6H8OUdQ26H91azW1-M1D-U6L88c",
+          "auth": "m_uO2GE_C1NXDpkbpcMUCQ"
+        }
+      }
+    }
+  ],
+  "messages": [
+    {
+      "tourId": "global",
+      "text": "pricekajte me 2 minute",
+      "userName": "Adnan Mahmic",
+      "timestamp": "2026-04-27T12:55:20.140Z"
+    },
+    {
+      "tourId": "global",
+      "text": "kasnim 5 minuta",
+      "userName": "Marko Vištica",
+      "timestamp": "2026-05-08T02:15:04.966Z"
+    },
+    {
+      "tourId": "global",
+      "text": "kasnim pet minuta",
+      "userName": "Marko Vištica",
+      "timestamp": "2026-05-08T02:15:19.113Z"
+    }
+  ]
+}
