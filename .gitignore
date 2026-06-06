@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment (secrets — Railway reads env vars from its dashboard, not this file)
+.env
+.env.local
+.env.*.local
+
+# Session files (dev only)
+data/sessions/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V1
+.Trashes
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime
+*.pid
