@@ -7,6 +7,12 @@
     "railway": {
       "type": "http",
       "url": "https://mcp.railway.com"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ]
     }
   }
 }
