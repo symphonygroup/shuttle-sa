@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev      # nodemon, ignores public/; port 3000
+npm run dev      # nodemon, ignores public/ and data/ (session-file-store writes there); port 3000
 npm start        # production start
 npm run stop     # kill port 3000
 npm run restart  # stop + dev
