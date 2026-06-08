@@ -9,6 +9,10 @@ node_modules/
 # Session files (dev only)
 data/sessions/
 
+# Runtime DB (contains user data + push tokens — seeded from data/db.example.json)
+data/db.json
+data/db.json.tmp
+
 # macOS
 .DS_Store
 .DS_Store?

@@ -10,7 +10,6 @@ let map = null;
 let busMarker = null;
 let driverWatchId = null;
 let activeMapTourId = null;
-let activeMsgTourId = null;
 let activeDriverTourId = null;
 let driverSharingLocation = false;
 
@@ -18,8 +17,16 @@ const TOTAL_SEATS = 19;
 
 // ── Init ───────────────────────────────────────────────────────────────────
 (async function init() {
-  const res = await fetch('/auth/user');
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch('/auth/user');
+    if (!res.ok) throw new Error('auth request failed');
+    data = await res.json();
+  } catch (e) {
+    console.error('Init failed:', e);
+    window.location.href = '/login';
+    return;
+  }
   if (!data.user) { window.location.href = '/login'; return; }
   currentUser = data.user;
 
@@ -40,11 +47,24 @@ const TOTAL_SEATS = 19;
   initDriverTourSelect();
   initPushNotifications();
   initModal();
+
+  // Clear GPS watch when leaving the page (driver location sharing)
+  window.addEventListener('beforeunload', () => {
+    if (driverWatchId != null) navigator.geolocation.clearWatch(driverWatchId);
+  });
 })();
 
 // ── Socket ─────────────────────────────────────────────────────────────────
 function initSocket() {
   socket = io();
+
+  // Re-join rooms after a dropped connection is restored
+  socket.io.on('reconnect', () => {
+    tours.forEach(t => socket.emit('joinTour', t.id));
+    if (activeMapTourId) socket.emit('joinTour', activeMapTourId);
+    socket.emit('joinGlobal');
+    if (currentUser && currentUser.isDriver) socket.emit('joinDriverInbox');
+  });
 
   socket.on('seatUpdate', ({ tourId, seatNumber, status, userName }) => {
     const tour = tours.find(t => t.id === tourId);
@@ -132,8 +152,15 @@ function initTabs() {
 
 // ── Tours ──────────────────────────────────────────────────────────────────
 async function loadTours() {
-  const res = await fetch('/api/tours');
-  tours = await res.json();
+  try {
+    const res = await fetch('/api/tours');
+    if (!res.ok) throw new Error('tours request failed');
+    tours = await res.json();
+  } catch (e) {
+    console.error('loadTours failed:', e);
+    showToast('❌ Greška pri učitavanju tura', 'error');
+    return;
+  }
   const grid = document.getElementById('toursGrid');
   grid.innerHTML = '';
   tours.forEach(tour => {
@@ -285,7 +312,7 @@ function updateModalPanels(tour) {
     stopSel.classList.add('hidden');
     myResPanel.classList.remove('hidden');
     document.getElementById('myResInfo').innerHTML =
-      `✅ Rezervisano: <strong>Sjedište ${tour.myReservation.seatNumber}</strong><br>📍 Stanica: <strong>${tour.myReservation.stop}</strong>`;
+      `✅ Rezervisano: <strong>Sjedište ${tour.myReservation.seatNumber}</strong><br>📍 Stanica: <strong>${escapeHtml(tour.myReservation.stop)}</strong>`;
   } else {
     stopSel.classList.add('hidden');
     myResPanel.classList.add('hidden');
@@ -354,8 +381,20 @@ async function doReserve() {
 async function doCancel() {
   if (!activeTour || !activeTour.myReservation) return;
   const { seatNumber } = activeTour.myReservation;
-  const res = await fetch(`/api/reserve/${activeTour.id}/${seatNumber}`, { method: 'DELETE' });
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch(`/api/reserve/${activeTour.id}/${seatNumber}`, { method: 'DELETE' });
+    if (res.redirected || res.status === 401) {
+      showToast('❌ Sesija istekla — prijavite se ponovo', 'error');
+      setTimeout(() => window.location.href = '/login', 1500);
+      return;
+    }
+    data = await res.json();
+  } catch (e) {
+    showToast('❌ Greška', 'error');
+    console.error('Cancel error:', e);
+    return;
+  }
   if (data.success) {
     const tour = tours.find(t => t.id === activeTour.id);
     if (tour) {
@@ -468,7 +507,9 @@ function playDing() {
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.3);
-  } catch (e) {}
+  } catch (e) {
+    console.warn('playDing failed:', e);
+  }
 }
 
 // ── Driver Panel ───────────────────────────────────────────────────────────
@@ -606,7 +647,9 @@ async function registerPushSubscription() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(sub)
     });
-  } catch {}
+  } catch (e) {
+    console.warn('push subscribe failed:', e);
+  }
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────

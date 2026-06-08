@@ -2,6 +2,12 @@ const fs = require('fs');
 const path = require('path');
 
 const DB_PATH = path.join(__dirname, 'data', 'db.json');
+const SEED = { reservations: {}, pushSubscriptions: [], messages: [] };
+
+// Ensure the runtime DB file exists (git-ignored; seeded from defaults on first boot)
+if (!fs.existsSync(DB_PATH)) {
+  fs.writeFileSync(DB_PATH, JSON.stringify(SEED, null, 2));
+}
 
 function readDB() {
   try {
@@ -12,7 +18,10 @@ function readDB() {
 }
 
 function writeDB(data) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  // Atomic write: tmp file + rename, so a crash mid-write can't truncate db.json
+  const tmp = `${DB_PATH}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, DB_PATH);
 }
 
 function getReservationsForTour(tourId) {
@@ -54,6 +63,14 @@ function getAllPushSubscriptions() {
   return readDB().pushSubscriptions || [];
 }
 
+function removePushSubscription(endpoint) {
+  if (!endpoint) return;
+  const db = readDB();
+  if (!Array.isArray(db.pushSubscriptions)) return;
+  db.pushSubscriptions = db.pushSubscriptions.filter(s => s.subscription?.endpoint !== endpoint);
+  writeDB(db);
+}
+
 function saveMessage(tourId, message) {
   const db = readDB();
   if (!Array.isArray(db.messages)) db.messages = [];
@@ -74,6 +91,7 @@ module.exports = {
   resetAllReservations,
   addPushSubscription,
   getAllPushSubscriptions,
+  removePushSubscription,
   saveMessage,
   getMessages
 };

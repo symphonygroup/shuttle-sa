@@ -1,10 +1,20 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const { ensureAuthenticated, ensureDriver } = require('../middleware/auth');
 const { TOURS, TOTAL_SEATS } = require('./tours');
 const db = require('../db');
 
 const reservationLocks = new Set();
+
+// Generous limit on mutating endpoints — far above real usage, blocks only floods
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Previše zahtjeva, pokušaj ponovo za koji trenutak' }
+});
 
 // Get all tours with reservation status
 router.get('/tours', ensureAuthenticated, (req, res) => {
@@ -42,7 +52,7 @@ router.get('/tours', ensureAuthenticated, (req, res) => {
 });
 
 // Reserve a seat
-router.post('/reserve', ensureAuthenticated, (req, res) => {
+router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
   const { tourId, stop } = req.body;
   const seatNumber = parseInt(req.body.seatNumber, 10);
   const userId = req.user.id;
@@ -100,10 +110,14 @@ router.post('/reserve', ensureAuthenticated, (req, res) => {
 });
 
 // Cancel a reservation
-router.delete('/reserve/:tourId/:seatNumber', ensureAuthenticated, (req, res) => {
+router.delete('/reserve/:tourId/:seatNumber', writeLimiter, ensureAuthenticated, (req, res) => {
   const { tourId, seatNumber } = req.params;
   const userId = req.user.id;
-  const seat = parseInt(seatNumber);
+  const seat = parseInt(seatNumber, 10);
+
+  if (!TOURS[tourId]) return res.status(400).json({ error: 'Invalid tour' });
+  if (isNaN(seat) || seat < 1 || seat > TOTAL_SEATS)
+    return res.status(400).json({ error: 'Invalid seat number' });
 
   const tourReservations = db.getReservationsForTour(tourId);
   const reservation = tourReservations[seat];
@@ -146,9 +160,12 @@ router.get('/driver/passengers/:tourId', ensureDriver, (req, res) => {
 });
 
 // Save push subscription
-router.post('/push/subscribe', ensureAuthenticated, (req, res) => {
-  const subscription = req.body;
-  db.addPushSubscription(req.user.id, subscription);
+router.post('/push/subscribe', writeLimiter, ensureAuthenticated, (req, res) => {
+  const sub = req.body;
+  const valid = sub && typeof sub.endpoint === 'string' &&
+    sub.keys && typeof sub.keys.p256dh === 'string' && typeof sub.keys.auth === 'string';
+  if (!valid) return res.status(400).json({ error: 'Invalid subscription' });
+  db.addPushSubscription(req.user.id, sub);
   res.json({ success: true });
 });
 
@@ -158,7 +175,7 @@ router.get('/push/vapid-key', (req, res) => {
 });
 
 // Manual reservation reset (driver only)
-router.post('/driver/reset', ensureDriver, (req, res) => {
+router.post('/driver/reset', writeLimiter, ensureDriver, (req, res) => {
   db.resetAllReservations();
   req.app.get('io').emit('reservationsReset');
   console.log('Reservations manually reset by driver:', req.user.email);
