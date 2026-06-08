@@ -61,6 +61,11 @@ In **production** (`NODE_ENV=production`) the server fails fast at boot if `GOOG
 - Chat is always global (no per-tour chat)
 - Push notification at 15:00 only fires if VAPID keys are configured and don't contain placeholder text
 
+## Workflow rules
+
+- **Playwright**: when used for manual testing/verification, Claude must manage the dev server lifecycle itself — start it before, stop it (`npm run stop`) and quit Chrome after, every run, no leftovers. Always launch Playwright with a default mobile viewport size (this is a mobile-first app).
+- **Definition of done**: before declaring any task complete, run `npm run lint` and `npm run format`, fix any reported issues, and re-run until both pass clean. A task is not done if linting/formatting fails.
+
 ## AI Docs Rules
 
 - Always update this @CLAUDE.md file if there are significant changes like:
