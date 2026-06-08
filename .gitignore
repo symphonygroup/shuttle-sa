@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# Playwright MCP
+.playwright-mcp/
+.playwright-cli/
+.playwright/
+
 # Environment (secrets — Railway reads env vars from its dashboard, not this file)
 .env
 .env.local
