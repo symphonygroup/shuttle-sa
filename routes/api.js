@@ -35,15 +35,13 @@ router.get('/tours', ensureAuthenticated, (req, res) => {
         seatNames[i] = res_user.userName;
       }
     }
-    const myReservation = Object.entries(tourReservations).find(
-      ([, r]) => r.userId === userId
-    );
+    const myReservation = Object.entries(tourReservations).find(([, r]) => r.userId === userId);
     return {
       ...tour,
       seats,
       seatNames,
       myReservation: myReservation
-        ? { seatNumber: parseInt(myReservation[0]), stop: myReservation[1].stop }
+        ? { seatNumber: parseInt(myReservation[0], 10), stop: myReservation[1].stop }
         : null,
       takenCount: Object.keys(tourReservations).length
     };
@@ -61,7 +59,7 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
   if (!TOURS[tourId]) return res.status(400).json({ error: 'Invalid tour' });
   if (!stop || !TOURS[tourId].stops.includes(stop))
     return res.status(400).json({ error: 'Invalid stop' });
-  if (isNaN(seatNumber) || seatNumber < 1 || seatNumber > TOTAL_SEATS)
+  if (Number.isNaN(seatNumber) || seatNumber < 1 || seatNumber > TOTAL_SEATS)
     return res.status(400).json({ error: 'Invalid seat number' });
 
   const lockKey = `${tourId}-${seatNumber}`;
@@ -74,7 +72,9 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
 
     const existing = Object.entries(tourReservations).find(([, r]) => r.userId === userId);
     if (existing)
-      return res.status(400).json({ error: 'Already reserved on this tour', seat: parseInt(existing[0]) });
+      return res
+        .status(400)
+        .json({ error: 'Already reserved on this tour', seat: parseInt(existing[0], 10) });
 
     // Check group limit: 1 morning tour + 1 afternoon tour per user
     const morningTours = ['morning1', 'morning2'];
@@ -83,17 +83,23 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
     const sibling = group.find(id => id !== tourId);
     if (sibling) {
       const siblingReservations = db.getReservationsForTour(sibling);
-      const siblingExisting = Object.entries(siblingReservations).find(([, r]) => r.userId === userId);
+      const siblingExisting = Object.entries(siblingReservations).find(
+        ([, r]) => r.userId === userId
+      );
       if (siblingExisting) {
         const label = morningTours.includes(tourId) ? 'jutarnjoj' : 'popodnevnoj';
         return res.status(400).json({ error: `Već imaš rezervaciju u drugoj ${label} turi` });
       }
     }
 
-    if (tourReservations[seatNumber])
-      return res.status(400).json({ error: 'Seat already taken' });
+    if (tourReservations[seatNumber]) return res.status(400).json({ error: 'Seat already taken' });
 
-    db.reserve(tourId, seatNumber, { userId, userName, stop, reservedAt: new Date().toISOString() });
+    db.reserve(tourId, seatNumber, {
+      userId,
+      userName,
+      stop,
+      reservedAt: new Date().toISOString()
+    });
 
     req.app.get('io').to(tourId).emit('seatUpdate', {
       tourId,
@@ -116,7 +122,7 @@ router.delete('/reserve/:tourId/:seatNumber', writeLimiter, ensureAuthenticated,
   const seat = parseInt(seatNumber, 10);
 
   if (!TOURS[tourId]) return res.status(400).json({ error: 'Invalid tour' });
-  if (isNaN(seat) || seat < 1 || seat > TOTAL_SEATS)
+  if (Number.isNaN(seat) || seat < 1 || seat > TOTAL_SEATS)
     return res.status(400).json({ error: 'Invalid seat number' });
 
   const tourReservations = db.getReservationsForTour(tourId);
@@ -147,7 +153,7 @@ router.get('/driver/passengers/:tourId', ensureDriver, (req, res) => {
 
   Object.entries(tourReservations).forEach(([seat, r]) => {
     if (!byStop[r.stop]) byStop[r.stop] = [];
-    byStop[r.stop].push({ seat: parseInt(seat), userName: r.userName });
+    byStop[r.stop].push({ seat: parseInt(seat, 10), userName: r.userName });
   });
 
   // Order by tour stop sequence
@@ -162,15 +168,19 @@ router.get('/driver/passengers/:tourId', ensureDriver, (req, res) => {
 // Save push subscription
 router.post('/push/subscribe', writeLimiter, ensureAuthenticated, (req, res) => {
   const sub = req.body;
-  const valid = sub && typeof sub.endpoint === 'string' &&
-    sub.keys && typeof sub.keys.p256dh === 'string' && typeof sub.keys.auth === 'string';
+  const valid =
+    sub &&
+    typeof sub.endpoint === 'string' &&
+    sub.keys &&
+    typeof sub.keys.p256dh === 'string' &&
+    typeof sub.keys.auth === 'string';
   if (!valid) return res.status(400).json({ error: 'Invalid subscription' });
   db.addPushSubscription(req.user.id, sub);
   res.json({ success: true });
 });
 
 // Get VAPID public key for push
-router.get('/push/vapid-key', (req, res) => {
+router.get('/push/vapid-key', (_req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 

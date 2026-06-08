@@ -13,7 +13,7 @@ npm run lint     # biome lint . (lint rules only, no format check)
 npm run format   # biome format --write . (opt-in; do NOT mass-reformat untouched files)
 ```
 
-No build step. No tests. Frontend is raw JS/HTML served statically — changes take effect on page reload. Linter/formatter is **Biome** (`biome.json`); noisy stylistic rules that fight the existing code (forEach, parseInt/isNaN globals, template literals, optional chaining) are disabled to keep diffs minimal.
+No build step. No tests. Frontend is raw JS/HTML served statically — changes take effect on page reload. Linter/formatter is **Biome v2** (`biome.json`); only `recommended` rules plus `a11y.useValidLang: off` (Biome's valid-language list lacks `bs`/Bosnian, a valid ISO 639-1 code used by the UI).
 
 ## Required environment variables
 

@@ -1,9 +1,7 @@
-'use strict';
-
 // ── State ──────────────────────────────────────────────────────────────────
 let currentUser = null;
 let tours = [];
-let activeTour = null;        // tour open in modal
+let activeTour = null; // tour open in modal
 let selectedSeat = null;
 let socket = null;
 let map = null;
@@ -11,7 +9,6 @@ let busMarker = null;
 let driverWatchId = null;
 let activeMapTourId = null;
 let activeDriverTourId = null;
-let driverSharingLocation = false;
 
 const TOTAL_SEATS = 19;
 
@@ -27,12 +24,18 @@ const TOTAL_SEATS = 19;
     window.location.href = '/login';
     return;
   }
-  if (!data.user) { window.location.href = '/login'; return; }
+  if (!data.user) {
+    window.location.href = '/login';
+    return;
+  }
   currentUser = data.user;
 
   document.getElementById('userName').textContent = currentUser.displayName.split(' ')[0];
   const avatar = document.getElementById('userAvatar');
-  if (currentUser.photo) { avatar.src = currentUser.photo; avatar.style.display = 'block'; }
+  if (currentUser.photo) {
+    avatar.src = currentUser.photo;
+    avatar.style.display = 'block';
+  }
 
   if (currentUser.isDriver) {
     document.getElementById('driverTabBtn').classList.remove('hidden');
@@ -60,10 +63,12 @@ function initSocket() {
 
   // Re-join rooms after a dropped connection is restored
   socket.io.on('reconnect', () => {
-    tours.forEach(t => socket.emit('joinTour', t.id));
+    tours.forEach(t => {
+      socket.emit('joinTour', t.id);
+    });
     if (activeMapTourId) socket.emit('joinTour', activeMapTourId);
     socket.emit('joinGlobal');
-    if (currentUser && currentUser.isDriver) socket.emit('joinDriverInbox');
+    if (currentUser?.isDriver) socket.emit('joinDriverInbox');
   });
 
   socket.on('seatUpdate', ({ tourId, seatNumber, status, userName }) => {
@@ -84,12 +89,16 @@ function initSocket() {
   });
 
   socket.on('reservationsReset', () => {
-    tours.forEach(t => { t.seats = {}; t.myReservation = null; t.takenCount = 0; });
+    tours.forEach(t => {
+      t.seats = {};
+      t.myReservation = null;
+      t.takenCount = 0;
+    });
     tours.forEach(renderTourCard);
     showToast('Rezervacije su resetovane 🔄');
   });
 
-  socket.on('driverLocation', (loc) => {
+  socket.on('driverLocation', loc => {
     if (!map) return;
     const latlng = [loc.lat, loc.lng];
     if (!busMarker) {
@@ -101,11 +110,14 @@ function initSocket() {
   });
 
   socket.on('driverLocationStopped', () => {
-    if (busMarker) { busMarker.remove(); busMarker = null; }
+    if (busMarker) {
+      busMarker.remove();
+      busMarker = null;
+    }
     updateMapStatus(false);
   });
 
-  socket.on('newMessage', (msg) => {
+  socket.on('newMessage', msg => {
     appendMessage(msg, false, 'messagesBox');
     if (currentUser.isDriver) {
       appendMessage(msg, false, 'driverMessagesBox');
@@ -113,12 +125,12 @@ function initSocket() {
     }
   });
 
-  socket.on('messageHistory', (messages) => {
+  socket.on('messageHistory', messages => {
     populateMessageBox('messagesBox', messages);
     if (currentUser.isDriver) populateMessageBox('driverMessagesBox', messages);
   });
 
-  socket.on('driverAlert', (msg) => {
+  socket.on('driverAlert', msg => {
     const driverTabActive = document.getElementById('tab-driver').classList.contains('active');
     const msgTabActive = document.getElementById('tab-messages').classList.contains('active');
     if (!driverTabActive && !msgTabActive) {
@@ -141,8 +153,12 @@ function initTabs() {
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
-      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(b => {
+        b.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-content').forEach(c => {
+        c.classList.remove('active');
+      });
       btn.classList.add('active');
       document.getElementById(`tab-${tab}`).classList.add('active');
       if (tab === 'map' && map) setTimeout(() => map.invalidateSize(), 100);
@@ -206,7 +222,7 @@ function initModal() {
 function openModal(tour) {
   activeTour = tour;
   selectedSeat = null;
-  document.getElementById('modalTourName').textContent = tour.name + ' · ' + tour.departureTime;
+  document.getElementById('modalTourName').textContent = `${tour.name} · ${tour.departureTime}`;
   renderSeatGrid(tour);
   updateModalPanels(tour);
   document.getElementById('seatModal').classList.remove('hidden');
@@ -262,7 +278,12 @@ function renderSeatGrid(tour) {
 }
 
 function getInitials(name) {
-  return (name || '').split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
+  return (name || '')
+    .split(' ')
+    .slice(0, 2)
+    .map(n => n[0])
+    .join('')
+    .toUpperCase();
 }
 
 function makeSeatEl(num, tour) {
@@ -298,7 +319,9 @@ function onSeatClick(seatNum, status, tour) {
   }
   // Free seat — select it
   selectedSeat = seatNum;
-  document.querySelectorAll('.seat').forEach(s => s.classList.remove('selected'));
+  document.querySelectorAll('.seat').forEach(s => {
+    s.classList.remove('selected');
+  });
   document.querySelector(`.seat[data-seat="${seatNum}"]`)?.classList.add('selected');
   populateStopSelect(tour);
   document.getElementById('stopSelector').classList.remove('hidden');
@@ -323,9 +346,7 @@ function populateStopSelect(tour) {
   const sel = document.getElementById('stopSelect');
   sel.innerHTML = '';
   // Exclude last stop (Office/Dobrinja) — destination
-  const stops = tour.direction === 'toOffice'
-    ? tour.stops.slice(0, -1)
-    : tour.stops.slice(1);
+  const stops = tour.direction === 'toOffice' ? tour.stops.slice(0, -1) : tour.stops.slice(1);
   stops.forEach(stop => {
     const opt = document.createElement('option');
     opt.value = stop;
@@ -349,7 +370,7 @@ async function doReserve() {
     });
     if (res.redirected || res.status === 401) {
       showToast('❌ Sesija istekla — prijavite se ponovo', 'error');
-      setTimeout(() => window.location.href = '/login', 1500);
+      setTimeout(() => (window.location.href = '/login'), 1500);
       return;
     }
     const data = await res.json();
@@ -367,7 +388,7 @@ async function doReserve() {
       }
       showToast(`✅ Rezervisano sjedište ${selectedSeat} na ${stop}`);
     } else {
-      showToast('❌ ' + (data.error || 'Greška'), 'error');
+      showToast(`❌ ${data.error || 'Greška'}`, 'error');
     }
   } catch (e) {
     showToast('❌ Greška pri rezervaciji', 'error');
@@ -379,14 +400,14 @@ async function doReserve() {
 }
 
 async function doCancel() {
-  if (!activeTour || !activeTour.myReservation) return;
+  if (!activeTour?.myReservation) return;
   const { seatNumber } = activeTour.myReservation;
   let data;
   try {
     const res = await fetch(`/api/reserve/${activeTour.id}/${seatNumber}`, { method: 'DELETE' });
     if (res.redirected || res.status === 401) {
       showToast('❌ Sesija istekla — prijavite se ponovo', 'error');
-      setTimeout(() => window.location.href = '/login', 1500);
+      setTimeout(() => (window.location.href = '/login'), 1500);
       return;
     }
     data = await res.json();
@@ -433,7 +454,10 @@ function initMapTourSelect() {
     if (activeMapTourId) socket.emit('leaveRoom', activeMapTourId);
     activeMapTourId = sel.value;
     if (activeMapTourId) socket.emit('joinTour', activeMapTourId);
-    if (busMarker) { busMarker.remove(); busMarker = null; }
+    if (busMarker) {
+      busMarker.remove();
+      busMarker = null;
+    }
     updateMapStatus(false);
   });
 }
@@ -472,7 +496,9 @@ function populateMessageBox(boxId, messages) {
     box.innerHTML = '<div class="msg-empty">Nema poruka</div>';
     return;
   }
-  messages.forEach(m => appendMessage(m, true, boxId));
+  messages.forEach(m => {
+    appendMessage(m, true, boxId);
+  });
   box.scrollTop = box.scrollHeight;
 }
 
@@ -558,51 +584,65 @@ async function loadPassengers(tourId) {
   const res = await fetch(`/api/driver/passengers/${tourId}`);
   const data = await res.json();
   const container = document.getElementById('passengerList');
-  if (!data.passengers || !data.passengers.length) {
-    container.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0">Nema rezervacija za ovu turu.</p>';
+  if (!data.passengers?.length) {
+    container.innerHTML =
+      '<p style="color:var(--muted);font-size:0.85rem;padding:0.5rem 0">Nema rezervacija za ovu turu.</p>';
     return;
   }
   container.innerHTML = `
     <div class="section-title" style="margin-bottom:0.75rem">Putnici po stanicama · ${data.total} ukupno</div>
-    ${data.passengers.map(s => `
+    ${data.passengers
+      .map(
+        s => `
       <div class="passenger-stop">
         <div class="passenger-stop-name">📍 ${escapeHtml(s.stop)}</div>
-        ${s.passengers.map(p => `
+        ${s.passengers
+          .map(
+            p => `
           <div class="passenger-row">
             <span class="seat-badge">S${p.seat}</span>
             <span>${escapeHtml(p.userName)}</span>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
-    `).join('')}
+    `
+      )
+      .join('')}
   `;
 }
 
 function startSharingLocation() {
-  if (!navigator.geolocation) { showToast('GPS nije dostupan', 'error'); return; }
-  driverSharingLocation = true;
+  if (!navigator.geolocation) {
+    showToast('GPS nije dostupan', 'error');
+    return;
+  }
   document.getElementById('startLocBtn').classList.add('hidden');
   document.getElementById('stopLocBtn').classList.remove('hidden');
   document.getElementById('locStatus').innerHTML =
     '<span class="status-dot online"></span> Dijeljenje lokacije aktivno';
 
   const tourId = activeDriverTourId;
-  driverWatchId = navigator.geolocation.watchPosition(pos => {
-    socket.emit('driverLocation', {
-      tourId,
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude
-    });
-  }, err => {
-    showToast('GPS greška: ' + err.message, 'error');
-    stopSharingLocation();
-  }, { enableHighAccuracy: true, maximumAge: 5000 });
+  driverWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      socket.emit('driverLocation', {
+        tourId,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      });
+    },
+    err => {
+      showToast(`GPS greška: ${err.message}`, 'error');
+      stopSharingLocation();
+    },
+    { enableHighAccuracy: true, maximumAge: 5000 }
+  );
 }
 
 function stopSharingLocation() {
   if (driverWatchId != null) navigator.geolocation.clearWatch(driverWatchId);
   driverWatchId = null;
-  driverSharingLocation = false;
   socket.emit('driverStopSharing', activeDriverTourId);
   document.getElementById('stopLocBtn').classList.add('hidden');
   document.getElementById('startLocBtn').classList.remove('hidden');
@@ -657,7 +697,6 @@ function showToast(msg, type = 'success') {
   const el = document.createElement('div');
   const bg = type === 'error' ? 'rgba(239,68,68,0.95)' : 'rgba(30,34,48,0.97)';
   const border = type === 'error' ? 'rgba(239,68,68,0.5)' : 'rgba(79,142,247,0.3)';
-  const icon = type === 'error' ? '' : '';
   el.style.cssText = `
     position:fixed;top:calc(var(--nav-h, 56px) + 0.75rem);bottom:auto;
     left:50%;transform:translateX(-50%) translateY(0);
@@ -689,11 +728,13 @@ function escapeHtml(str) {
 function formatTime(ts) {
   try {
     return new Date(ts).toLocaleTimeString('bs', { hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 }
 
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
