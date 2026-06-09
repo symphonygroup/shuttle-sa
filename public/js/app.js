@@ -465,7 +465,7 @@ function initMapTourSelect() {
 function updateMapStatus(online) {
   const el = document.getElementById('mapStatus');
   el.innerHTML = online
-    ? '<span class="status-dot online"></span> Bus je aktivan — live praćenje'
+    ? '<span class="status-dot online"></span> Bus je aktivan — praćenje uživo'
     : '<span class="status-dot offline"></span> Bus nije aktivan';
 }
 
@@ -701,8 +701,8 @@ function showToast(msg, type = 'success') {
     position:fixed;top:calc(var(--nav-h, 56px) + 0.75rem);bottom:auto;
     left:50%;transform:translateX(-50%) translateY(0);
     background:${bg};border:1px solid ${border};
-    color:#fff;padding:0.65rem 1.25rem;border-radius:12px;
-    font-size:0.85rem;font-weight:600;z-index:9999;
+    color:#fff;padding:0.7rem 1.25rem;border-radius:12px;
+    font-size:0.9rem;font-weight:600;z-index:9999;
     white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,0.4);
     backdrop-filter:blur(8px);
     animation:toastIn 0.3s cubic-bezier(0.16,1,0.3,1);
