@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# Playwright MCP
+.playwright-mcp/
+.playwright-cli/
+.playwright/
+
 # Environment (secrets — Railway reads env vars from its dashboard, not this file)
 .env
 .env.local
@@ -8,6 +13,10 @@ node_modules/
 
 # Session files (dev only)
 data/sessions/
+
+# Runtime DB (contains user data + push tokens — seeded from data/db.example.json)
+data/db.json
+data/db.json.tmp
 
 # macOS
 .DS_Store

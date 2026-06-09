@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0f1117">
 <title>Symphony Shuttle</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/socket.io/socket.io.js"></script>
@@ -26,10 +27,10 @@
 
 <!-- TABS -->
 <div class="tabs-bar" id="tabsBar">
-  <button class="tab active" data-tab="tours">Ture</button>
-  <button class="tab" data-tab="map">Mapa</button>
-  <button class="tab" data-tab="messages">Poruke</button>
-  <button class="tab driver-tab hidden" data-tab="driver" id="driverTabBtn">Vozač</button>
+  <button type="button" class="tab active" data-tab="tours">Ture</button>
+  <button type="button" class="tab" data-tab="map">Mapa</button>
+  <button type="button" class="tab" data-tab="messages">Poruke</button>
+  <button type="button" class="tab driver-tab hidden" data-tab="driver" id="driverTabBtn">Vozač</button>
 </div>
 
 <!-- MAIN CONTENT -->
@@ -63,7 +64,7 @@
     </div>
     <div class="message-input-row" id="messageInputRow">
       <input type="text" class="msg-input" id="msgInput" placeholder="Poruka vozaču..." maxlength="200">
-      <button class="send-btn" id="sendBtn">➤</button>
+      <button type="button" class="send-btn" id="sendBtn">➤</button>
     </div>
   </section>
 
@@ -84,11 +85,11 @@
           <div class="loc-status" id="locStatus">
             <span class="status-dot offline"></span> Lokacija nije aktivna
           </div>
-          <button class="loc-btn start" id="startLocBtn">📍 Počni dijeljenje lokacije</button>
-          <button class="loc-btn stop hidden" id="stopLocBtn">⛔ Zaustavi lokaciju</button>
+          <button type="button" class="loc-btn start" id="startLocBtn">📍 Počni dijeljenje lokacije</button>
+          <button type="button" class="loc-btn stop hidden" id="stopLocBtn">⛔ Zaustavi lokaciju</button>
         </div>
         <div id="passengerList"></div>
-        <button class="driver-reset-btn" id="driverResetBtn">🔄 Resetuj sve rezervacije</button>
+        <button type="button" class="driver-reset-btn" id="driverResetBtn">🔄 Resetuj sve rezervacije</button>
       </div>
 
       <!-- Right/bottom: Inbox -->
@@ -99,7 +100,7 @@
         </div>
         <div class="message-input-row">
           <input type="text" class="msg-input" id="driverMsgInput" placeholder="Odgovor putnicima..." maxlength="200">
-          <button class="send-btn" id="driverSendBtn">➤</button>
+          <button type="button" class="send-btn" id="driverSendBtn">➤</button>
         </div>
       </div>
 
@@ -113,18 +114,18 @@
   <div class="modal">
     <div class="modal-header">
       <span id="modalTourName"></span>
-      <button class="modal-close" id="modalClose">✕</button>
+      <button type="button" class="modal-close" id="modalClose">✕</button>
     </div>
     <div class="modal-body">
       <div id="seatGrid"></div>
       <div class="stop-selector hidden" id="stopSelector">
         <label>Odaberi stanicu ukrcaja:</label>
         <select id="stopSelect"></select>
-        <button class="reserve-btn" id="reserveBtn">Rezerviši sjedište</button>
+        <button type="button" class="reserve-btn" id="reserveBtn">Rezerviši sjedište</button>
       </div>
       <div class="my-reservation hidden" id="myReservationPanel">
         <div class="my-res-info" id="myResInfo"></div>
-        <button class="cancel-btn" id="cancelBtn">Otkaži rezervaciju</button>
+        <button type="button" class="cancel-btn" id="cancelBtn">Otkaži rezervaciju</button>
       </div>
       <div class="seat-legend">
         <span class="legend-item"><span class="dot green"></span> Slobodno</span>
@@ -139,8 +140,8 @@
 <!-- PUSH NOTIFY PROMPT -->
 <div class="notify-banner hidden" id="notifyBanner">
   <span>Uključi notifikacije za podsjetnik u 15:00 🔔</span>
-  <button id="enableNotify">Uključi</button>
-  <button id="dismissNotify">✕</button>
+  <button type="button" id="enableNotify">Uključi</button>
+  <button type="button" id="dismissNotify">✕</button>
 </div>
 
 <script src="/js/app.js"></script>
