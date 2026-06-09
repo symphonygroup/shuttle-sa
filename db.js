@@ -74,9 +74,23 @@ function removePushSubscription(endpoint) {
 function saveMessage(tourId, message) {
   const db = readDB();
   if (!Array.isArray(db.messages)) db.messages = [];
-  db.messages.push({ tourId, ...message, timestamp: new Date().toISOString() });
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const timestamp = new Date().toISOString();
+  const saved = { id, tourId, ...message, timestamp, liked: false };
+  db.messages.push(saved);
   if (db.messages.length > 200) db.messages = db.messages.slice(-200);
   writeDB(db);
+  return saved;
+}
+
+function likeMessage(msgId) {
+  const db = readDB();
+  if (!Array.isArray(db.messages)) return null;
+  const msg = db.messages.find(m => m.id === msgId);
+  if (!msg) return null;
+  msg.liked = !msg.liked;
+  writeDB(db);
+  return msg;
 }
 
 function getMessages(tourId) {
@@ -93,5 +107,6 @@ module.exports = {
   getAllPushSubscriptions,
   removePushSubscription,
   saveMessage,
-  getMessages
+  getMessages,
+  likeMessage
 };

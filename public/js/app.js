@@ -130,6 +130,12 @@ function initSocket() {
     if (currentUser.isDriver) populateMessageBox('driverMessagesBox', messages);
   });
 
+  socket.on('messageLiked', ({ id, liked }) => {
+    document.querySelectorAll(`[data-msg-id="${id}"] .msg-heart`).forEach(heart => {
+      heart.classList.toggle('liked', liked);
+    });
+  });
+
   socket.on('driverAlert', msg => {
     const driverTabActive = document.getElementById('tab-driver').classList.contains('active');
     const msgTabActive = document.getElementById('tab-messages').classList.contains('active');
@@ -137,6 +143,20 @@ function initSocket() {
       showToast(`💬 ${msg.userName}: ${msg.text.slice(0, 40)}${msg.text.length > 40 ? '…' : ''}`);
     }
   });
+
+  if (currentUser.isDriver) {
+    ['messagesBox', 'driverMessagesBox'].forEach(boxId => {
+      const box = document.getElementById(boxId);
+      if (!box) return;
+      box.addEventListener('click', e => {
+        const heartBtn = e.target.closest('[data-action="like"]');
+        if (!heartBtn) return;
+        const msgItem = heartBtn.closest('[data-msg-id]');
+        if (!msgItem) return;
+        socket.emit('likeMessage', msgItem.dataset.msgId);
+      });
+    });
+  }
 }
 
 function busIcon() {
@@ -511,10 +531,20 @@ function appendMessage(msg, skipScroll = false, boxId = 'messagesBox') {
   const isMine = msg.userName === currentUser.displayName;
   const div = document.createElement('div');
   div.className = `msg-item${isMine ? ' mine' : ''}`;
+  if (msg.id) div.dataset.msgId = msg.id;
+
+  let heartHtml = '';
+  if (msg.id) {
+    const likedClass = msg.liked ? ' liked' : '';
+    const driverClass = currentUser.isDriver ? ' driver-heart' : '';
+    heartHtml = `<button class="msg-heart${likedClass}${driverClass}" data-action="like" aria-label="Lajkuj">❤</button>`;
+  }
+
   div.innerHTML = `
     <div class="msg-sender">${escapeHtml(msg.userName)}</div>
     <div class="msg-text">${escapeHtml(msg.text)}</div>
     <div class="msg-time">${formatTime(msg.timestamp)}</div>
+    ${heartHtml}
   `;
   box.appendChild(div);
   if (!skipScroll) box.scrollTop = box.scrollHeight;
