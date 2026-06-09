@@ -179,6 +179,15 @@ body {
   margin-bottom: 0.75rem;
 }
 
+/* RIDE DATE LABEL */
+.ride-date-label {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 1rem;
+  letter-spacing: 0.01em;
+}
+
 /* TOURS GRID */
 .tours-grid {
   display: grid;

@@ -187,6 +187,43 @@ function initTabs() {
 }
 
 // ── Tours ──────────────────────────────────────────────────────────────────
+function getRideDate() {
+  const MONTHS = [
+    'januar',
+    'februar',
+    'mart',
+    'april',
+    'maj',
+    'juni',
+    'juli',
+    'august',
+    'septembar',
+    'oktobar',
+    'novembar',
+    'decembar'
+  ];
+  const now = new Date();
+  const tz = 'Europe/Sarajevo';
+  const hourStr = new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    hour12: false,
+    timeZone: tz
+  }).format(now);
+  const isTomorrow = parseInt(hourStr, 10) >= 11;
+  const target = new Date(now);
+  if (isTomorrow) target.setDate(target.getDate() + 1);
+  const parts = new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+    timeZone: tz
+  }).formatToParts(target);
+  const day = parseInt(parts.find(p => p.type === 'day').value, 10);
+  const month = parseInt(parts.find(p => p.type === 'month').value, 10) - 1;
+  const year = parts.find(p => p.type === 'year').value;
+  return `${isTomorrow ? 'Sutra' : 'Danas'}, ${day}. ${MONTHS[month]} ${year}.`;
+}
+
 async function loadTours() {
   try {
     const res = await fetch('/api/tours');
@@ -197,6 +234,7 @@ async function loadTours() {
     showToast('❌ Greška pri učitavanju tura', 'error');
     return;
   }
+  document.getElementById('rideDateLabel').textContent = getRideDate();
   const grid = document.getElementById('toursGrid');
   grid.innerHTML = '';
   tours.forEach(tour => {
