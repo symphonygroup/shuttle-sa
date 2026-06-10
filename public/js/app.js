@@ -77,15 +77,26 @@ function initSocket() {
     if (status === 'free') {
       delete tour.seats[seatNumber];
       if (tour.seatNames) delete tour.seatNames[seatNumber];
+      // Seat freed externally (e.g. driver cancelled) — clear local reservation state
+      if (tour.myReservation?.seatNumber === seatNumber) {
+        tour.myReservation = null;
+      }
     } else {
-      tour.seats[seatNumber] = status;
+      // Server always sends 'taken'; preserve 'mine' if this is the current user's seat
+      tour.seats[seatNumber] = tour.myReservation?.seatNumber === seatNumber ? 'mine' : status;
       if (userName) {
         if (!tour.seatNames) tour.seatNames = {};
         tour.seatNames[seatNumber] = userName;
       }
     }
     renderTourCard(tour);
-    if (activeTour && activeTour.id === tourId) renderSeatGrid(tour);
+    if (activeTour && activeTour.id === tourId) {
+      renderSeatGrid(tour);
+      updateModalPanels(tour);
+    }
+    if (currentUser?.isDriver && activeDriverTourId === tourId) {
+      loadPassengers(tourId);
+    }
   });
 
   socket.on('reservationsReset', () => {
@@ -95,6 +106,13 @@ function initSocket() {
       t.takenCount = 0;
     });
     tours.forEach(renderTourCard);
+    if (activeTour) {
+      renderSeatGrid(activeTour);
+      updateModalPanels(activeTour);
+    }
+    if (currentUser?.isDriver && activeDriverTourId) {
+      loadPassengers(activeDriverTourId);
+    }
     showToast('Rezervacije su resetovane 🔄');
   });
 
