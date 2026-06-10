@@ -68,8 +68,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Session — file store in both envs (prod needs a Railway persistent volume on ./data)
+const SESSION_TTL_SECONDS = 5 * 24 * 60 * 60; // 5 days
+
 const sessionStore = new FileStore({
   path: path.join(__dirname, 'data', 'sessions'),
+  ttl: SESSION_TTL_SECONDS,
   retries: 1,
   logFn: () => {
     /* silence session-file-store logging */
@@ -80,12 +83,13 @@ const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'change_me',
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   store: sessionStore,
   cookie: {
     secure: isProd,
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    maxAge: SESSION_TTL_SECONDS * 1000
   }
 });
 app.use(sessionMiddleware);
