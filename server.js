@@ -252,11 +252,17 @@ io.on('connection', socket => {
     const text = (data?.text || '').toString().trim().slice(0, MAX_MSG_LEN);
     const userName = (data?.userName || '').toString().trim();
     if (!text || !userName) return;
-    const msg = { text, userName, timestamp: new Date().toISOString() };
-    db.saveMessage('global', msg);
+    const msg = db.saveMessage('global', { text, userName });
     io.to('global').emit('newMessage', msg);
     // Real-time alert to all connected drivers
     io.to('driver-inbox').emit('driverAlert', msg);
+  });
+
+  socket.on('likeMessage', msgId => {
+    if (!user.isDriver) return;
+    const msg = db.likeMessage(String(msgId));
+    if (!msg) return;
+    io.to('global').emit('messageLiked', { id: msg.id, liked: msg.liked });
   });
 });
 

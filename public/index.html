@@ -39,13 +39,14 @@
   <!-- TOURS TAB -->
   <section class="tab-content active" id="tab-tours">
     <div class="section-title">Odaberi turu i sjedište</div>
+    <div class="ride-date-label" id="rideDateLabel"></div>
     <div class="tours-grid" id="toursGrid"></div>
   </section>
 
   <!-- MAP TAB -->
   <section class="tab-content" id="tab-map">
     <div class="map-header">
-      <div class="section-title">Live lokacija busa</div>
+      <div class="section-title">Lokacija busa uživo</div>
       <select class="map-tour-select" id="mapTourSelect">
         <option value="">-- Odaberi turu --</option>
       </select>
@@ -76,7 +77,7 @@
       <div class="driver-panel driver-panel-tours">
         <div class="section-title">Ture</div>
         <div class="driver-tour-pick">
-          <label>Aktiva tura:</label>
+          <label>Aktivna tura:</label>
           <select id="driverTourSelect" class="map-tour-select">
             <option value="">-- Odaberi turu --</option>
           </select>
@@ -94,7 +95,7 @@
 
       <!-- Right/bottom: Inbox -->
       <div class="driver-panel driver-panel-messages">
-        <div class="section-title">Inbox</div>
+        <div class="section-title">Pristigle poruke</div>
         <div class="messages-box" id="driverMessagesBox">
           <div class="msg-empty">Nema poruka</div>
         </div>

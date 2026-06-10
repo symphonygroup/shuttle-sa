@@ -56,11 +56,11 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
   const userId = req.user.id;
   const userName = req.user.displayName;
 
-  if (!TOURS[tourId]) return res.status(400).json({ error: 'Invalid tour' });
+  if (!TOURS[tourId]) return res.status(400).json({ error: 'Nevažeća tura' });
   if (!stop || !TOURS[tourId].stops.includes(stop))
-    return res.status(400).json({ error: 'Invalid stop' });
+    return res.status(400).json({ error: 'Nevažeća stanica' });
   if (Number.isNaN(seatNumber) || seatNumber < 1 || seatNumber > TOTAL_SEATS)
-    return res.status(400).json({ error: 'Invalid seat number' });
+    return res.status(400).json({ error: 'Nevažeći broj sjedišta' });
 
   const lockKey = `${tourId}-${seatNumber}`;
   if (reservationLocks.has(lockKey))
@@ -74,7 +74,7 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
     if (existing)
       return res
         .status(400)
-        .json({ error: 'Already reserved on this tour', seat: parseInt(existing[0], 10) });
+        .json({ error: 'Već imaš rezervaciju na ovoj turi', seat: parseInt(existing[0], 10) });
 
     // Check group limit: 1 morning tour + 1 afternoon tour per user
     const morningTours = ['morning1', 'morning2'];
@@ -92,7 +92,8 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
       }
     }
 
-    if (tourReservations[seatNumber]) return res.status(400).json({ error: 'Seat already taken' });
+    if (tourReservations[seatNumber])
+      return res.status(400).json({ error: 'Sjedište je već zauzeto' });
 
     db.reserve(tourId, seatNumber, {
       userId,
@@ -121,16 +122,16 @@ router.delete('/reserve/:tourId/:seatNumber', writeLimiter, ensureAuthenticated,
   const userId = req.user.id;
   const seat = parseInt(seatNumber, 10);
 
-  if (!TOURS[tourId]) return res.status(400).json({ error: 'Invalid tour' });
+  if (!TOURS[tourId]) return res.status(400).json({ error: 'Nevažeća tura' });
   if (Number.isNaN(seat) || seat < 1 || seat > TOTAL_SEATS)
-    return res.status(400).json({ error: 'Invalid seat number' });
+    return res.status(400).json({ error: 'Nevažeći broj sjedišta' });
 
   const tourReservations = db.getReservationsForTour(tourId);
   const reservation = tourReservations[seat];
 
-  if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
+  if (!reservation) return res.status(404).json({ error: 'Rezervacija nije pronađena' });
   if (reservation.userId !== userId && !req.user.isDriver)
-    return res.status(403).json({ error: 'Not your reservation' });
+    return res.status(403).json({ error: 'Nije tvoja rezervacija' });
 
   db.cancelReservation(tourId, seat);
 
@@ -146,7 +147,7 @@ router.delete('/reserve/:tourId/:seatNumber', writeLimiter, ensureAuthenticated,
 // Get passengers for driver
 router.get('/driver/passengers/:tourId', ensureDriver, (req, res) => {
   const { tourId } = req.params;
-  if (!TOURS[tourId]) return res.status(400).json({ error: 'Invalid tour' });
+  if (!TOURS[tourId]) return res.status(400).json({ error: 'Nevažeća tura' });
 
   const tourReservations = db.getReservationsForTour(tourId);
   const byStop = {};
@@ -174,7 +175,7 @@ router.post('/push/subscribe', writeLimiter, ensureAuthenticated, (req, res) => 
     sub.keys &&
     typeof sub.keys.p256dh === 'string' &&
     typeof sub.keys.auth === 'string';
-  if (!valid) return res.status(400).json({ error: 'Invalid subscription' });
+  if (!valid) return res.status(400).json({ error: 'Nevažeća pretplata na notifikacije' });
   db.addPushSubscription(req.user.id, sub);
   res.json({ success: true });
 });

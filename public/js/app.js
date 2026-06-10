@@ -148,6 +148,12 @@ function initSocket() {
     if (currentUser.isDriver) populateMessageBox('driverMessagesBox', messages);
   });
 
+  socket.on('messageLiked', ({ id, liked }) => {
+    document.querySelectorAll(`[data-msg-id="${id}"] .msg-heart`).forEach(heart => {
+      heart.classList.toggle('liked', liked);
+    });
+  });
+
   socket.on('driverAlert', msg => {
     const driverTabActive = document.getElementById('tab-driver').classList.contains('active');
     const msgTabActive = document.getElementById('tab-messages').classList.contains('active');
@@ -155,6 +161,20 @@ function initSocket() {
       showToast(`💬 ${msg.userName}: ${msg.text.slice(0, 40)}${msg.text.length > 40 ? '…' : ''}`);
     }
   });
+
+  if (currentUser.isDriver) {
+    ['messagesBox', 'driverMessagesBox'].forEach(boxId => {
+      const box = document.getElementById(boxId);
+      if (!box) return;
+      box.addEventListener('click', e => {
+        const heartBtn = e.target.closest('[data-action="like"]');
+        if (!heartBtn) return;
+        const msgItem = heartBtn.closest('[data-msg-id]');
+        if (!msgItem) return;
+        socket.emit('likeMessage', msgItem.dataset.msgId);
+      });
+    });
+  }
 }
 
 function busIcon() {
@@ -185,6 +205,43 @@ function initTabs() {
 }
 
 // ── Tours ──────────────────────────────────────────────────────────────────
+function getRideDate() {
+  const MONTHS = [
+    'januar',
+    'februar',
+    'mart',
+    'april',
+    'maj',
+    'juni',
+    'juli',
+    'august',
+    'septembar',
+    'oktobar',
+    'novembar',
+    'decembar'
+  ];
+  const now = new Date();
+  const tz = 'Europe/Sarajevo';
+  const hourStr = new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    hour12: false,
+    timeZone: tz
+  }).format(now);
+  const isTomorrow = parseInt(hourStr, 10) >= 11;
+  const target = new Date(now);
+  if (isTomorrow) target.setDate(target.getDate() + 1);
+  const parts = new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+    timeZone: tz
+  }).formatToParts(target);
+  const day = parseInt(parts.find(p => p.type === 'day').value, 10);
+  const month = parseInt(parts.find(p => p.type === 'month').value, 10) - 1;
+  const year = parts.find(p => p.type === 'year').value;
+  return `${isTomorrow ? 'Sutra' : 'Danas'}, ${day}. ${MONTHS[month]} ${year}.`;
+}
+
 async function loadTours() {
   try {
     const res = await fetch('/api/tours');
@@ -195,6 +252,7 @@ async function loadTours() {
     showToast('❌ Greška pri učitavanju tura', 'error');
     return;
   }
+  document.getElementById('rideDateLabel').textContent = getRideDate();
   const grid = document.getElementById('toursGrid');
   grid.innerHTML = '';
   tours.forEach(tour => {
@@ -483,7 +541,7 @@ function initMapTourSelect() {
 function updateMapStatus(online) {
   const el = document.getElementById('mapStatus');
   el.innerHTML = online
-    ? '<span class="status-dot online"></span> Bus je aktivan — live praćenje'
+    ? '<span class="status-dot online"></span> Bus je aktivan — praćenje uživo'
     : '<span class="status-dot offline"></span> Bus nije aktivan';
 }
 
@@ -529,10 +587,20 @@ function appendMessage(msg, skipScroll = false, boxId = 'messagesBox') {
   const isMine = msg.userName === currentUser.displayName;
   const div = document.createElement('div');
   div.className = `msg-item${isMine ? ' mine' : ''}`;
+  if (msg.id) div.dataset.msgId = msg.id;
+
+  let heartHtml = '';
+  if (msg.id) {
+    const likedClass = msg.liked ? ' liked' : '';
+    const driverClass = currentUser.isDriver ? ' driver-heart' : '';
+    heartHtml = `<button class="msg-heart${likedClass}${driverClass}" data-action="like" aria-label="Lajkuj">❤</button>`;
+  }
+
   div.innerHTML = `
     <div class="msg-sender">${escapeHtml(msg.userName)}</div>
     <div class="msg-text">${escapeHtml(msg.text)}</div>
     <div class="msg-time">${formatTime(msg.timestamp)}</div>
+    ${heartHtml}
   `;
   box.appendChild(div);
   if (!skipScroll) box.scrollTop = box.scrollHeight;
@@ -719,8 +787,8 @@ function showToast(msg, type = 'success') {
     position:fixed;top:calc(var(--nav-h, 56px) + 0.75rem);bottom:auto;
     left:50%;transform:translateX(-50%) translateY(0);
     background:${bg};border:1px solid ${border};
-    color:#fff;padding:0.65rem 1.25rem;border-radius:12px;
-    font-size:0.85rem;font-weight:600;z-index:9999;
+    color:#fff;padding:0.7rem 1.25rem;border-radius:12px;
+    font-size:0.9rem;font-weight:600;z-index:9999;
     white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,0.4);
     backdrop-filter:blur(8px);
     animation:toastIn 0.3s cubic-bezier(0.16,1,0.3,1);
