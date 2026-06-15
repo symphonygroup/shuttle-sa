@@ -327,7 +327,9 @@ function defaultManifestTourId() {
     ? tours.slice()
     : tours.filter(t => depMinutes(t.departureTime) >= nowMinutesSarajevo());
   const pool = upcoming.length ? upcoming : tours.slice();
-  const byTime = [...pool].sort((a, b) => depMinutes(a.departureTime) - depMinutes(b.departureTime));
+  const byTime = [...pool].sort(
+    (a, b) => depMinutes(a.departureTime) - depMinutes(b.departureTime)
+  );
   const mine = byTime.find(t => t.myReservation);
   return (mine || byTime[0]).id;
 }
