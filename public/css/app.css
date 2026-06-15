@@ -1005,6 +1005,55 @@ body {
   }
 }
 
+/* TABLET (driver uses a tablet) — scale up UI, no horizontal overflow */
+@media (min-width: 768px) {
+  :root {
+    --nav-h: 68px;
+    --tabs-h: 60px;
+  }
+  html,
+  body {
+    font-size: 18px;
+  }
+  .main {
+    padding: 1.5rem;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .tab {
+    min-height: 60px;
+    font-size: 1rem;
+  }
+  .tours-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .modal {
+    max-width: 560px;
+    border-radius: 24px;
+    margin-bottom: auto;
+  }
+  .modal-overlay {
+    align-items: center;
+    padding: 1.5rem;
+  }
+  /* Bus seat grid: enlarge px-based seats/aisle (rem fonts already scaled) */
+  .seat,
+  .seat-empty {
+    width: 58px;
+    height: 52px;
+  }
+  .bus-aisle {
+    width: 24px;
+    height: 52px;
+  }
+  .seat {
+    font-size: 0.95rem;
+    border-radius: 10px;
+  }
+}
+
 /* LEAFLET DARK */
 .leaflet-container {
   background: #1a1d27;
