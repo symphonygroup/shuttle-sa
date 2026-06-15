@@ -43,11 +43,11 @@ In **production** (`NODE_ENV=production`) the server fails fast at boot if `GOOG
 **Database** (`db.js` + `data/db.json`): Flat JSON file, **git-ignored** (was previously committed with real data). Seeded from `data/db.example.json`, auto-created on boot if missing. Writes are atomic (tmp file + rename). No ORM, no migrations. Schema: `{ reservations: {tourId: {seatNumber: {userId, userName, stop, reservedAt}}}, pushSubscriptions: [], messages: [] }`. Expired push subs (404/410) pruned by the 15:00 cron.
 
 **Routes**:
-- `routes/api.js`: REST endpoints under `/api` — tours list, reserve/cancel, driver passenger list, push subscriptions, manual reset. Mutating endpoints (`reserve`, cancel, `push/subscribe`, `driver/reset`) are behind a per-IP `express-rate-limit` (60/min). Plus `GET /health` in `server.js` for Railway healthchecks.
+- `routes/api.js`: REST endpoints under `/api` — tours list, reserve/cancel, driver passenger list, public passenger manifest, push subscriptions, manual reset. `GET /tours/:tourId/passengers` (any authed user) and driver-only `GET /driver/passengers/:tourId` share `buildManifest()` (names grouped by stop, route order; exposes only userName/seat/stop). Mutating endpoints (`reserve`, cancel, `push/subscribe`, `driver/reset`) are behind a per-IP `express-rate-limit` (60/min). Plus `GET /health` in `server.js` for Railway healthchecks.
 - `routes/tours.js`: Static `TOURS` config object + `TOTAL_SEATS=19`. All tour data (stops, times, direction) lives here.
 - Auth routes inline in `server.js`: `/auth/google`, `/auth/google/callback`, `/auth/logout`, `/auth/user`
 
-**Frontend** (`public/`): Single-page app, no bundler. `public/js/app.js` is one large file with all UI logic. Tabs: tours, map (Leaflet + OpenStreetMap), chat, driver panel (hidden for non-drivers). State is module-level vars. Socket.io for real-time seat updates, GPS location sharing, and chat.
+**Frontend** (`public/`): Single-page app, no bundler. `public/js/app.js` is one large file with all UI logic. Tabs: tours, map (Leaflet + OpenStreetMap), chat, driver panel (hidden for non-drivers). Tours tab also has a "Ko putuje" manifest (tour selector → colleague names by station, route order, live via `seatUpdate`/`reservationsReset`). State is module-level vars. Socket.io for real-time seat updates, GPS location sharing, and chat. Responsive tablet breakpoint at `min-width:768px` (driver uses a tablet); `min-width:700px` reflows the driver split.
 
 **Cron jobs** (in `server.js`): Reset all reservations daily at 11:00 Europe/Sarajevo; send push notifications at 15:00.
 
@@ -56,6 +56,8 @@ In **production** (`NODE_ENV=production`) the server fails fast at boot if `GOOG
 ## Key business rules
 
 - 1 reservation per user per morning group (`morning1`/`morning2`) and 1 per afternoon group (`afternoon1`/`afternoon2`)
+- A station must be chosen before reserving (no auto-selected first stop; reserve button disabled until chosen; BE still 400s on empty/invalid stop)
+- Drivers like a chat message by double-tapping it (≤350ms), not by clicking the heart; heart is a visual indicator only. Like toggle stays driver-only (server-gated)
 - Drivers can cancel any reservation; users can only cancel their own
 - `isDriver` flag on the session user object gates driver endpoints (`ensureDriver` middleware)
 - Chat is always global (no per-tour chat)

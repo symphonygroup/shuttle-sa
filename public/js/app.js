@@ -9,6 +9,7 @@ let busMarker = null;
 let driverWatchId = null;
 let activeMapTourId = null;
 let activeDriverTourId = null;
+let manifestTourId = null;
 
 const TOTAL_SEATS = 19;
 
@@ -45,6 +46,7 @@ const TOTAL_SEATS = 19;
   initTabs();
   initMap();
   await loadTours();
+  initManifest();
   initMapTourSelect();
   initMessages();
   initDriverTourSelect();
@@ -97,6 +99,7 @@ function initSocket() {
     if (currentUser?.isDriver && activeDriverTourId === tourId) {
       loadPassengers(tourId);
     }
+    if (manifestTourId === tourId) loadManifest(tourId);
   });
 
   socket.on('reservationsReset', () => {
@@ -113,6 +116,7 @@ function initSocket() {
     if (currentUser?.isDriver && activeDriverTourId) {
       loadPassengers(activeDriverTourId);
     }
+    if (manifestTourId) loadManifest(manifestTourId);
     showToast('Rezervacije su resetovane 🔄');
   });
 
@@ -163,15 +167,26 @@ function initSocket() {
   });
 
   if (currentUser.isDriver) {
+    // Driver toggles like by double-tapping anywhere on a message (mouse + touch).
+    let lastTapTs = 0;
+    let lastTapId = null;
+    const DOUBLE_TAP_MS = 350;
     ['messagesBox', 'driverMessagesBox'].forEach(boxId => {
       const box = document.getElementById(boxId);
       if (!box) return;
       box.addEventListener('click', e => {
-        const heartBtn = e.target.closest('[data-action="like"]');
-        if (!heartBtn) return;
-        const msgItem = heartBtn.closest('[data-msg-id]');
+        const msgItem = e.target.closest('[data-msg-id]');
         if (!msgItem) return;
-        socket.emit('likeMessage', msgItem.dataset.msgId);
+        const id = msgItem.dataset.msgId;
+        const now = Date.now();
+        if (id === lastTapId && now - lastTapTs <= DOUBLE_TAP_MS) {
+          socket.emit('likeMessage', id);
+          lastTapTs = 0;
+          lastTapId = null;
+        } else {
+          lastTapTs = now;
+          lastTapId = id;
+        }
       });
     });
   }
@@ -285,6 +300,95 @@ function renderTourCard(tour) {
   `;
 }
 
+// ── Manifest (Ko putuje) ─────────────────────────────────────────────────────
+function nowMinutesSarajevo() {
+  const parts = new Intl.DateTimeFormat('en', {
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+    timeZone: 'Europe/Sarajevo'
+  }).formatToParts(new Date());
+  const h = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  const m = parseInt(parts.find(p => p.type === 'minute').value, 10);
+  return h * 60 + m;
+}
+
+function depMinutes(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function defaultManifestTourId() {
+  if (!tours.length) return null;
+  // Same 11:00 cutoff as getRideDate(): after 11:00 the ride window is tomorrow,
+  // so every tour counts as upcoming; before 11:00 only tours not yet departed.
+  const afterCutoff = nowMinutesSarajevo() >= 11 * 60;
+  const upcoming = afterCutoff
+    ? tours.slice()
+    : tours.filter(t => depMinutes(t.departureTime) >= nowMinutesSarajevo());
+  const pool = upcoming.length ? upcoming : tours.slice();
+  const byTime = [...pool].sort(
+    (a, b) => depMinutes(a.departureTime) - depMinutes(b.departureTime)
+  );
+  const mine = byTime.find(t => t.myReservation);
+  return (mine || byTime[0]).id;
+}
+
+function initManifest() {
+  const sel = document.getElementById('manifestTourSelect');
+  if (!sel) return;
+  tours.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.name} · ${t.departureTime}`;
+    sel.appendChild(opt);
+  });
+  manifestTourId = defaultManifestTourId();
+  if (manifestTourId) {
+    sel.value = manifestTourId;
+    loadManifest(manifestTourId);
+  }
+  sel.addEventListener('change', () => {
+    manifestTourId = sel.value;
+    loadManifest(manifestTourId);
+  });
+}
+
+async function loadManifest(tourId) {
+  let data;
+  try {
+    const res = await fetch(`/api/tours/${tourId}/passengers`);
+    if (!res.ok) throw new Error('manifest request failed');
+    data = await res.json();
+  } catch (e) {
+    console.error('loadManifest failed:', e);
+    return;
+  }
+  if (manifestTourId !== tourId) return; // selection changed while fetching
+  renderManifest(data);
+}
+
+function renderManifest(data) {
+  const container = document.getElementById('manifestList');
+  if (!container) return;
+  if (!data.passengers?.length) {
+    container.innerHTML = '<p class="manifest-empty">Nema rezervacija za ovu turu.</p>';
+    return;
+  }
+  container.innerHTML = data.passengers
+    .map(
+      s => `
+      <div class="passenger-stop">
+        <div class="passenger-stop-name">📍 ${escapeHtml(s.stop)}</div>
+        ${s.passengers
+          .map(p => `<div class="passenger-row"><span>${escapeHtml(p.userName)}</span></div>`)
+          .join('')}
+      </div>
+    `
+    )
+    .join('');
+}
+
 // ── Modal / Seat Grid ──────────────────────────────────────────────────────
 function initModal() {
   document.getElementById('modalClose').addEventListener('click', closeModal);
@@ -293,6 +397,9 @@ function initModal() {
   });
   document.getElementById('reserveBtn').addEventListener('click', doReserve);
   document.getElementById('cancelBtn').addEventListener('click', doCancel);
+  document.getElementById('stopSelect').addEventListener('change', e => {
+    document.getElementById('reserveBtn').disabled = !e.target.value;
+  });
 }
 
 function openModal(tour) {
@@ -400,6 +507,7 @@ function onSeatClick(seatNum, status, tour) {
   });
   document.querySelector(`.seat[data-seat="${seatNum}"]`)?.classList.add('selected');
   populateStopSelect(tour);
+  document.getElementById('reserveBtn').disabled = true;
   document.getElementById('stopSelector').classList.remove('hidden');
   document.getElementById('myReservationPanel').classList.add('hidden');
 }
@@ -421,6 +529,12 @@ function updateModalPanels(tour) {
 function populateStopSelect(tour) {
   const sel = document.getElementById('stopSelect');
   sel.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  placeholder.textContent = '-- Odaberi stanicu --';
+  sel.appendChild(placeholder);
   // Exclude last stop (Office/Dobrinja) — destination
   const stops = tour.direction === 'toOffice' ? tour.stops.slice(0, -1) : tour.stops.slice(1);
   stops.forEach(stop => {
@@ -434,6 +548,10 @@ function populateStopSelect(tour) {
 async function doReserve() {
   if (!activeTour || !selectedSeat) return;
   const stop = document.getElementById('stopSelect').value;
+  if (!stop) {
+    showToast('❌ Odaberi stanicu', 'error');
+    return;
+  }
   const btn = document.getElementById('reserveBtn');
   btn.disabled = true;
   btn.textContent = 'Rezervišem...';
