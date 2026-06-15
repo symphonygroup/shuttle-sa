@@ -163,15 +163,26 @@ function initSocket() {
   });
 
   if (currentUser.isDriver) {
+    // Driver toggles like by double-tapping anywhere on a message (mouse + touch).
+    let lastTapTs = 0;
+    let lastTapId = null;
+    const DOUBLE_TAP_MS = 350;
     ['messagesBox', 'driverMessagesBox'].forEach(boxId => {
       const box = document.getElementById(boxId);
       if (!box) return;
       box.addEventListener('click', e => {
-        const heartBtn = e.target.closest('[data-action="like"]');
-        if (!heartBtn) return;
-        const msgItem = heartBtn.closest('[data-msg-id]');
+        const msgItem = e.target.closest('[data-msg-id]');
         if (!msgItem) return;
-        socket.emit('likeMessage', msgItem.dataset.msgId);
+        const id = msgItem.dataset.msgId;
+        const now = Date.now();
+        if (id === lastTapId && now - lastTapTs <= DOUBLE_TAP_MS) {
+          socket.emit('likeMessage', id);
+          lastTapTs = 0;
+          lastTapId = null;
+        } else {
+          lastTapTs = now;
+          lastTapId = id;
+        }
       });
     });
   }
@@ -293,6 +304,9 @@ function initModal() {
   });
   document.getElementById('reserveBtn').addEventListener('click', doReserve);
   document.getElementById('cancelBtn').addEventListener('click', doCancel);
+  document.getElementById('stopSelect').addEventListener('change', e => {
+    document.getElementById('reserveBtn').disabled = !e.target.value;
+  });
 }
 
 function openModal(tour) {
@@ -400,6 +414,7 @@ function onSeatClick(seatNum, status, tour) {
   });
   document.querySelector(`.seat[data-seat="${seatNum}"]`)?.classList.add('selected');
   populateStopSelect(tour);
+  document.getElementById('reserveBtn').disabled = true;
   document.getElementById('stopSelector').classList.remove('hidden');
   document.getElementById('myReservationPanel').classList.add('hidden');
 }
@@ -421,6 +436,12 @@ function updateModalPanels(tour) {
 function populateStopSelect(tour) {
   const sel = document.getElementById('stopSelect');
   sel.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  placeholder.textContent = '-- Odaberi stanicu --';
+  sel.appendChild(placeholder);
   // Exclude last stop (Office/Dobrinja) — destination
   const stops = tour.direction === 'toOffice' ? tour.stops.slice(0, -1) : tour.stops.slice(1);
   stops.forEach(stop => {
@@ -434,6 +455,10 @@ function populateStopSelect(tour) {
 async function doReserve() {
   if (!activeTour || !selectedSeat) return;
   const stop = document.getElementById('stopSelect').value;
+  if (!stop) {
+    showToast('❌ Odaberi stanicu', 'error');
+    return;
+  }
   const btn = document.getElementById('reserveBtn');
   btn.disabled = true;
   btn.textContent = 'Rezervišem...';
