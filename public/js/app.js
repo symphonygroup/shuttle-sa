@@ -7,7 +7,6 @@ let socket = null;
 let map = null;
 let busMarker = null;
 let driverWatchId = null;
-let activeMapTourId = null;
 let activeDriverTourId = null;
 let manifestTourId = null;
 
@@ -47,7 +46,6 @@ const TOTAL_SEATS = 19;
   initMap();
   await loadTours();
   initManifest();
-  initMapTourSelect();
   initMessages();
   initDriverTourSelect();
   initPushNotifications();
@@ -68,7 +66,6 @@ function initSocket() {
     tours.forEach(t => {
       socket.emit('joinTour', t.id);
     });
-    if (activeMapTourId) socket.emit('joinTour', activeMapTourId);
     socket.emit('joinGlobal');
     if (currentUser?.isDriver) socket.emit('joinDriverInbox');
   });
@@ -125,10 +122,11 @@ function initSocket() {
     const latlng = [loc.lat, loc.lng];
     if (!busMarker) {
       busMarker = L.marker(latlng, { icon: busIcon() }).addTo(map);
+      map.setView(latlng, 14);
     } else {
       busMarker.setLatLng(latlng);
     }
-    updateMapStatus(true);
+    showActiveRide(loc);
   });
 
   socket.on('driverLocationStopped', () => {
@@ -136,7 +134,7 @@ function initSocket() {
       busMarker.remove();
       busMarker = null;
     }
-    updateMapStatus(false);
+    showNoRide();
   });
 
   socket.on('newMessage', msg => {
@@ -636,31 +634,25 @@ function initMap() {
   }).addTo(map);
 }
 
-function initMapTourSelect() {
-  const sel = document.getElementById('mapTourSelect');
-  tours.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    opt.textContent = `${t.name} · ${t.departureTime}`;
-    sel.appendChild(opt);
-  });
-  sel.addEventListener('change', () => {
-    if (activeMapTourId) socket.emit('leaveRoom', activeMapTourId);
-    activeMapTourId = sel.value;
-    if (activeMapTourId) socket.emit('joinTour', activeMapTourId);
-    if (busMarker) {
-      busMarker.remove();
-      busMarker = null;
-    }
-    updateMapStatus(false);
-  });
+// Active ride drives the map: overlay names the live tour, empty state covers the
+// map when no driver is sharing. No tour selector — clients already join all rooms.
+function showActiveRide(loc) {
+  const overlay = document.getElementById('mapActiveTour');
+  const empty = document.getElementById('mapEmpty');
+  if (overlay) {
+    const time = loc.departureTime ? ` · ${loc.departureTime}` : '';
+    overlay.innerHTML = `<span class="status-dot online"></span> <strong>${escapeHtml(loc.name || 'Aktivna vožnja')}</strong>${time} — praćenje uživo`;
+    overlay.classList.remove('hidden');
+  }
+  if (empty) empty.classList.add('hidden');
+  if (map) setTimeout(() => map.invalidateSize(), 50);
 }
 
-function updateMapStatus(online) {
-  const el = document.getElementById('mapStatus');
-  el.innerHTML = online
-    ? '<span class="status-dot online"></span> Bus je aktivan — praćenje uživo'
-    : '<span class="status-dot offline"></span> Bus nije aktivan';
+function showNoRide() {
+  const overlay = document.getElementById('mapActiveTour');
+  const empty = document.getElementById('mapEmpty');
+  if (overlay) overlay.classList.add('hidden');
+  if (empty) empty.classList.remove('hidden');
 }
 
 // ── Messages ───────────────────────────────────────────────────────────────
