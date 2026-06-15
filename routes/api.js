@@ -144,11 +144,8 @@ router.delete('/reserve/:tourId/:seatNumber', writeLimiter, ensureAuthenticated,
   res.json({ success: true });
 });
 
-// Get passengers for driver
-router.get('/driver/passengers/:tourId', ensureDriver, (req, res) => {
-  const { tourId } = req.params;
-  if (!TOURS[tourId]) return res.status(400).json({ error: 'Nevažeća tura' });
-
+// Build passenger manifest grouped by stop, ordered by tour route sequence
+function buildManifest(tourId) {
   const tourReservations = db.getReservationsForTour(tourId);
   const byStop = {};
 
@@ -157,13 +154,26 @@ router.get('/driver/passengers/:tourId', ensureDriver, (req, res) => {
     byStop[r.stop].push({ seat: parseInt(seat, 10), userName: r.userName });
   });
 
-  // Order by tour stop sequence
-  const stops = TOURS[tourId].stops;
-  const ordered = stops
+  // Order by tour stop sequence (driver pickup order)
+  const ordered = TOURS[tourId].stops
     .filter(stop => byStop[stop])
     .map(stop => ({ stop, passengers: byStop[stop] }));
 
-  res.json({ tourId, passengers: ordered, total: Object.keys(tourReservations).length });
+  return { tourId, passengers: ordered, total: Object.keys(tourReservations).length };
+}
+
+// Get passengers for driver
+router.get('/driver/passengers/:tourId', ensureDriver, (req, res) => {
+  const { tourId } = req.params;
+  if (!TOURS[tourId]) return res.status(400).json({ error: 'Nevažeća tura' });
+  res.json(buildManifest(tourId));
+});
+
+// Get passengers for any authenticated employee (homepage "who rides" manifest)
+router.get('/tours/:tourId/passengers', ensureAuthenticated, (req, res) => {
+  const { tourId } = req.params;
+  if (!TOURS[tourId]) return res.status(400).json({ error: 'Nevažeća tura' });
+  res.json(buildManifest(tourId));
 });
 
 // Save push subscription

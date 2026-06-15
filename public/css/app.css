@@ -308,6 +308,27 @@ body {
   white-space: nowrap;
 }
 
+/* MANIFEST (Ko putuje) */
+.manifest-section {
+  margin-top: 1.75rem;
+}
+.manifest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.manifest-header .section-title {
+  margin-bottom: 0;
+}
+.manifest-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0.5rem 0;
+}
+
 /* MAP */
 .map-header {
   display: flex;
