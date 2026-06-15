@@ -3,6 +3,7 @@ let currentUser = null;
 let tours = [];
 let activeTour = null; // tour open in modal
 let selectedSeat = null;
+let pendingCancelSeat = null; // seat whose cancel panel is shown (managers: any of their seats)
 let socket = null;
 let map = null;
 let busMarker = null;
@@ -70,12 +71,13 @@ function initSocket() {
     if (currentUser?.isDriver) socket.emit('joinDriverInbox');
   });
 
-  socket.on('seatUpdate', ({ tourId, seatNumber, status, userName }) => {
+  socket.on('seatUpdate', ({ tourId, seatNumber, status, userName, guest }) => {
     const tour = tours.find(t => t.id === tourId);
     if (!tour) return;
     if (status === 'free') {
       delete tour.seats[seatNumber];
       if (tour.seatNames) delete tour.seatNames[seatNumber];
+      if (tour.seatGuests) delete tour.seatGuests[seatNumber];
       // Seat freed externally (e.g. driver cancelled) — clear local reservation state
       if (tour.myReservation?.seatNumber === seatNumber) {
         tour.myReservation = null;
@@ -87,6 +89,9 @@ function initSocket() {
         if (!tour.seatNames) tour.seatNames = {};
         tour.seatNames[seatNumber] = userName;
       }
+      if (!tour.seatGuests) tour.seatGuests = {};
+      if (guest) tour.seatGuests[seatNumber] = true;
+      else delete tour.seatGuests[seatNumber];
     }
     renderTourCard(tour);
     if (activeTour && activeTour.id === tourId) {
@@ -379,7 +384,10 @@ function renderManifest(data) {
       <div class="passenger-stop">
         <div class="passenger-stop-name">📍 ${escapeHtml(s.stop)}</div>
         ${s.passengers
-          .map(p => `<div class="passenger-row"><span>${escapeHtml(p.userName)}</span></div>`)
+          .map(
+            p =>
+              `<div class="passenger-row"><span>${escapeHtml(p.userName)}${p.guest ? ' <span class="guest-badge">★ Gost</span>' : ''}</span></div>`
+          )
           .join('')}
       </div>
     `
@@ -403,6 +411,7 @@ function initModal() {
 function openModal(tour) {
   activeTour = tour;
   selectedSeat = null;
+  pendingCancelSeat = null;
   document.getElementById('modalTourName').textContent = `${tour.name} · ${tour.departureTime}`;
   renderSeatGrid(tour);
   updateModalPanels(tour);
@@ -415,6 +424,7 @@ function closeModal() {
   document.body.style.overflow = '';
   activeTour = null;
   selectedSeat = null;
+  pendingCancelSeat = null;
 }
 
 function renderSeatGrid(tour) {
@@ -473,9 +483,11 @@ function makeSeatEl(num, tour) {
   div.className = `seat ${status}`;
   div.dataset.seat = num;
   if (status === 'taken' || status === 'mine') {
-    const initials = getInitials(tour.seatNames?.[num] || '');
+    const isGuest = !!tour.seatGuests?.[num];
+    const label = isGuest ? '★' : getInitials(tour.seatNames?.[num] || '');
     div.classList.add('seat--named');
-    div.innerHTML = `<span class="seat-num">${num}</span><span class="seat-initials">${initials}</span>`;
+    if (isGuest) div.classList.add('seat--guest');
+    div.innerHTML = `<span class="seat-num">${num}</span><span class="seat-initials">${label}</span>`;
   } else {
     div.textContent = num;
   }
@@ -494,12 +506,20 @@ function makeEmptySeatEl() {
 function onSeatClick(seatNum, status, tour) {
   if (status === 'taken') return;
   if (status === 'mine') {
-    // Just show cancel panel
-    updateModalPanels(tour);
+    // Show cancel panel for this specific seat (managers may own several)
+    pendingCancelSeat = seatNum;
+    selectedSeat = null;
+    document.querySelectorAll('.seat').forEach(s => {
+      s.classList.remove('selected');
+    });
+    document.getElementById('stopSelector').classList.add('hidden');
+    renderCancelInfo(tour, seatNum);
+    document.getElementById('myReservationPanel').classList.remove('hidden');
     return;
   }
   // Free seat — select it
   selectedSeat = seatNum;
+  pendingCancelSeat = null;
   document.querySelectorAll('.seat').forEach(s => {
     s.classList.remove('selected');
   });
@@ -510,9 +530,40 @@ function onSeatClick(seatNum, status, tour) {
   document.getElementById('myReservationPanel').classList.add('hidden');
 }
 
+function renderCancelInfo(tour, seat) {
+  const isGuest = !!tour.seatGuests?.[seat];
+  const isMyRes = tour.myReservation?.seatNumber === seat;
+  const guestLine = isGuest ? ' <span class="guest-badge">★ Gost</span>' : '';
+  const stopLine =
+    isMyRes && tour.myReservation.stop
+      ? `<br>📍 Stanica: <strong>${escapeHtml(tour.myReservation.stop)}</strong>`
+      : '';
+  const name = tour.seatNames?.[seat];
+  const nameLine = !isMyRes && name ? `<br>👤 <strong>${escapeHtml(name)}</strong>` : '';
+  document.getElementById('myResInfo').innerHTML =
+    `✅ Rezervisano: <strong>Sjedište ${seat}</strong>${guestLine}${stopLine}${nameLine}`;
+}
+
 function updateModalPanels(tour) {
   const stopSel = document.getElementById('stopSelector');
   const myResPanel = document.getElementById('myReservationPanel');
+  const hint = document.getElementById('managerHint');
+  if (hint) hint.classList.toggle('hidden', !currentUser.isManager);
+
+  // Managers hold many seats: panels are driven by explicit seat clicks, not a
+  // single reservation. Keep an open cancel panel only while its seat is still mine.
+  if (currentUser.isManager) {
+    stopSel.classList.add('hidden');
+    if (pendingCancelSeat != null && tour.seats[pendingCancelSeat] === 'mine') {
+      renderCancelInfo(tour, pendingCancelSeat);
+      myResPanel.classList.remove('hidden');
+    } else {
+      pendingCancelSeat = null;
+      myResPanel.classList.add('hidden');
+    }
+    return;
+  }
+
   if (tour.myReservation) {
     stopSel.classList.add('hidden');
     myResPanel.classList.remove('hidden');
@@ -568,17 +619,26 @@ async function doReserve() {
     const data = await res.json();
     if (data.success) {
       const tour = tours.find(t => t.id === activeTour.id);
+      const bookedSeat = selectedSeat;
       if (tour) {
-        tour.seats[selectedSeat] = 'mine';
+        tour.seats[bookedSeat] = 'mine';
         if (!tour.seatNames) tour.seatNames = {};
-        tour.seatNames[selectedSeat] = currentUser.displayName;
-        tour.myReservation = { seatNumber: selectedSeat, stop };
+        tour.seatNames[bookedSeat] = currentUser.displayName;
+        if (currentUser.isManager) {
+          // Guest booking — keep modal open so the manager can book more seats.
+          if (!tour.seatGuests) tour.seatGuests = {};
+          tour.seatGuests[bookedSeat] = true;
+          selectedSeat = null;
+          document.getElementById('stopSelector').classList.add('hidden');
+        } else {
+          tour.myReservation = { seatNumber: bookedSeat, stop };
+        }
         activeTour = tour;
         renderSeatGrid(tour);
         updateModalPanels(tour);
         renderTourCard(tour);
       }
-      showToast(`✅ Rezervisano sjedište ${selectedSeat} na ${stop}`);
+      showToast(`✅ Rezervisano sjedište ${bookedSeat} na ${stop}`);
     } else {
       showToast(`❌ ${data.error || 'Greška'}`, 'error');
     }
@@ -592,8 +652,8 @@ async function doReserve() {
 }
 
 async function doCancel() {
-  if (!activeTour?.myReservation) return;
-  const { seatNumber } = activeTour.myReservation;
+  const seatNumber = pendingCancelSeat ?? activeTour?.myReservation?.seatNumber;
+  if (!activeTour || seatNumber == null) return;
   let data;
   try {
     const res = await fetch(`/api/reserve/${activeTour.id}/${seatNumber}`, { method: 'DELETE' });
@@ -613,7 +673,9 @@ async function doCancel() {
     if (tour) {
       delete tour.seats[seatNumber];
       if (tour.seatNames) delete tour.seatNames[seatNumber];
-      tour.myReservation = null;
+      if (tour.seatGuests) delete tour.seatGuests[seatNumber];
+      if (tour.myReservation?.seatNumber === seatNumber) tour.myReservation = null;
+      pendingCancelSeat = null;
       activeTour = tour;
       renderSeatGrid(tour);
       updateModalPanels(tour);
@@ -797,7 +859,7 @@ async function loadPassengers(tourId) {
             p => `
           <div class="passenger-row">
             <span class="seat-badge">S${p.seat}</span>
-            <span>${escapeHtml(p.userName)}</span>
+            <span>${escapeHtml(p.userName)}${p.guest ? ' <span class="guest-badge">★ Gost</span>' : ''}</span>
           </div>
         `
           )
