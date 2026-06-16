@@ -120,7 +120,7 @@ Drop in `globals.css` / `styles/tokens.css` and import once at the app root.
 
   /* Primary tints (selected row, chip) */
   --color-bg-primary-tint:     var(--color-primary-100);
-  --color-bg-primary-tint-hov: var(--color-primary-200);
+  --color-bg-primary-tint-hover: var(--color-primary-200);
   --color-text-primary-tint:   var(--color-primary-800);
 
   /* Status */
@@ -207,7 +207,7 @@ Drop in `globals.css` / `styles/tokens.css` and import once at the app root.
 
   /* Primary tints — flip from solid 100/200 to alpha + Primary 300 fg */
   --color-bg-primary-tint:     rgba(108, 105, 255, 0.16);
-  --color-bg-primary-tint-hov: rgba(108, 105, 255, 0.24);
+  --color-bg-primary-tint-hover: rgba(108, 105, 255, 0.24);
   --color-text-primary-tint:   var(--color-primary-300);
 
   /* Status — derived: bg = rgba(<500>, 0.15), fg = <300>, border = rgba(<500>, 0.32) */
@@ -252,6 +252,7 @@ Drop in `globals.css` / `styles/tokens.css` and import once at the app root.
     --color-text-primary:    var(--color-grey-100);
     --color-text-body:       var(--color-grey-300);
     --color-text-secondary:  var(--color-grey-500);
+    --color-text-tertiary:   var(--color-grey-600);
     --color-text-disabled:   var(--color-grey-700);
     --color-text-link-hover: var(--color-primary-300);
     --color-border-default:       var(--color-grey-800);
@@ -259,7 +260,7 @@ Drop in `globals.css` / `styles/tokens.css` and import once at the app root.
     --color-border-hairline:      var(--color-grey-900);
     --color-bg-primary-disabled: rgba(108, 105, 255, 0.32);
     --color-bg-primary-tint:     rgba(108, 105, 255, 0.16);
-    --color-bg-primary-tint-hov: rgba(108, 105, 255, 0.24);
+    --color-bg-primary-tint-hover: rgba(108, 105, 255, 0.24);
     --color-text-primary-tint:   var(--color-primary-300);
     --color-status-info-bg:      rgba(70, 134, 245, 0.15);
     --color-status-info-fg:      var(--color-blue-300);
@@ -375,7 +376,7 @@ export default {
           primaryPress: "var(--color-bg-primary-press)",
           primaryDisabled: "var(--color-bg-primary-disabled)",
           primaryTint:    "var(--color-bg-primary-tint)",
-          primaryTintHov: "var(--color-bg-primary-tint-hov)",
+          primaryTintHover: "var(--color-bg-primary-tint-hover)",
           destructive: "var(--color-bg-destructive)",
           scrim:       "var(--color-scrim)",
         },
@@ -536,21 +537,103 @@ export default {
 
 **Class examples**: `bg-bg-surface text-fg-primary border border-stroke-default` for a card, `bg-bg-primary text-fg-onPrimary` for a CTA, `bg-status-infoBg text-status-infoFg border border-status-infoBorder` for an info badge. All four flip correctly under `<html class="dark">`.
 
-### Tailwind v4 `@theme` block (alternative)
+### Tailwind v4 (`@theme inline`)
+
+In v4, use `@custom-variant` for `.dark` class support and `@theme inline` to expose CSS custom properties as Tailwind utilities. Paste the full `:root` and `.dark` blocks from §1 first, then add:
 
 ```css
-/* app/globals.css with Tailwind v4 */
+/* app/globals.css — Tailwind v4 */
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+/* Activate .dark class-based dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
 
-  --color-primary-500: #6C69FF;
-  --color-primary-700: #4C4AB3;
-  --color-primary-800: #333194;
-  /* ...etc — mirror the :root block above ... */
+/* ── Paste the full :root and .dark blocks from §1 here ── */
+
+/* Expose CSS vars as Tailwind utilities via @theme inline.
+ * Classes generated match the variable name:
+ *   --color-bg-page         → bg-bg-page / text-bg-page / border-bg-page
+ *   --color-fg-primary      → bg-fg-primary / text-fg-primary
+ *   --color-stroke-default  → bg-stroke-default / border-stroke-default
+ * All semantic aliases auto-flip with .dark because they reference CSS vars. */
+@theme inline {
+  /* Typography */
+  --font-family-sans: var(--font-family-sans);
+
+  --font-weight-regular:  var(--font-weight-regular);
+  --font-weight-medium:   var(--font-weight-medium);
+  --font-weight-semibold: var(--font-weight-semibold);
+  --font-weight-bold:     var(--font-weight-bold);
+
+  --font-size-h1:        var(--font-size-h1);
+  --font-size-h2:        var(--font-size-h2);
+  --font-size-h3:        var(--font-size-h3);
+  --font-size-h4:        var(--font-size-h4);
+  --font-size-h5:        var(--font-size-h5);
+  --font-size-h6:        var(--font-size-h6);
+  --font-size-body-l:    var(--font-size-body-l);
+  --font-size-body-m:    var(--font-size-body-m);
+  --font-size-body-s:    var(--font-size-body-s);
+  --font-size-caption-m: var(--font-size-caption-m);
+  --font-size-caption-s: var(--font-size-caption-s);
+
+  /* Semantic surface colors */
+  --color-bg-page:               var(--color-bg-page);
+  --color-bg-surface:            var(--color-bg-surface);
+  --color-bg-surface-alt:        var(--color-bg-surface-alt);
+  --color-bg-sunken:             var(--color-bg-sunken);
+  --color-bg-hover:              var(--color-bg-hover);
+  --color-bg-press:              var(--color-bg-press);
+  --color-bg-primary:            var(--color-bg-primary);
+  --color-bg-primary-hover:      var(--color-bg-primary-hover);
+  --color-bg-primary-press:      var(--color-bg-primary-press);
+  --color-bg-primary-disabled:   var(--color-bg-primary-disabled);
+  --color-bg-primary-tint:       var(--color-bg-primary-tint);
+  --color-bg-primary-tint-hover: var(--color-bg-primary-tint-hover);
+  --color-bg-destructive:        var(--color-bg-destructive);
+  --color-bg-scrim:              var(--color-scrim);
+
+  /* Semantic text colors — mapped to fg- prefix to produce text-fg-* classes */
+  --color-fg-primary:      var(--color-text-primary);
+  --color-fg-body:         var(--color-text-body);
+  --color-fg-secondary:    var(--color-text-secondary);
+  --color-fg-tertiary:     var(--color-text-tertiary);
+  --color-fg-disabled:     var(--color-text-disabled);
+  --color-fg-on-primary:   var(--color-text-on-primary);
+  --color-fg-on-scrim:     var(--color-text-on-scrim);
+  --color-fg-link:         var(--color-text-link);
+  --color-fg-link-hover:   var(--color-text-link-hover);
+  --color-fg-primary-tint: var(--color-text-primary-tint);
+
+  /* Semantic border colors — mapped to stroke- prefix */
+  --color-stroke-default:       var(--color-border-default);
+  --color-stroke-default-hover: var(--color-border-default-hover);
+  --color-stroke-hairline:      var(--color-border-hairline);
+  --color-stroke-focus:         var(--color-border-focus);
+
+  /* Status */
+  --color-status-info-bg:        var(--color-status-info-bg);
+  --color-status-info-fg:        var(--color-status-info-fg);
+  --color-status-info-border:    var(--color-status-info-border);
+  --color-status-success-bg:     var(--color-status-success-bg);
+  --color-status-success-fg:     var(--color-status-success-fg);
+  --color-status-success-border: var(--color-status-success-border);
+  --color-status-warning-bg:     var(--color-status-warning-bg);
+  --color-status-warning-fg:     var(--color-status-warning-fg);
+  --color-status-warning-border: var(--color-status-warning-border);
+  --color-status-error-bg:       var(--color-status-error-bg);
+  --color-status-error-fg:       var(--color-status-error-fg);
+  --color-status-error-border:   var(--color-status-error-border);
+
+  /* Shadows */
+  --shadow-card:  var(--shadow-card);
+  --shadow-modal: var(--shadow-modal);
 }
 ```
+
+**v4 vs v3 class names**: identical — `bg-bg-page`, `text-fg-primary`, `border-stroke-default`, `shadow-card`, `text-h1`, `font-semibold`, etc. Components written for v3 work unchanged in v4 after this swap.
+
+**Line-height in v4**: `--font-size-*` in `@theme inline` emits only the size, not the line-height tuple. Add `leading-[1.5]` on the element or set `line-height: 1.5` in a `@layer base` block to keep the design system rule.
 
 ---
 
@@ -628,16 +711,42 @@ export const typography = {
   letterSpacing: 0,
 } as const;
 
-export const lightSemantic = {
+// Explicit Semantic interface — both light and dark objects conform to this.
+// Using an interface (not typeof lightSemantic) avoids the "as unknown as" cast
+// that would otherwise be needed because dark status/tint values are raw rgba()
+// strings while light values resolve to typed scale references.
+export interface Semantic {
   bg: {
-    page:        color.light.appBg,
-    surface:     color.light.white,
-    surfaceAlt:  color.light.grey,
-    sunken:      color.grey[100],
-    hover:       color.greyAlpha[50],
-    press:       color.greyAlpha[100],
-    primaryTint: color.primary[100],
-    scrim:       color.greyAlpha[500],
+    page: string; surface: string; surfaceAlt: string; sunken: string;
+    hover: string; press: string; primaryTint: string; primaryTintHover: string; scrim: string;
+  };
+  text: {
+    primary: string; body: string; secondary: string; tertiary: string;
+    disabled: string; onPrimary: string; onScrim: string;
+    link: string; linkHover: string; primaryTint: string;
+  };
+  border: {
+    default: string; defaultHover: string; hairline: string; focus: string;
+  };
+  status: {
+    info:    { bg: string; fg: string; border: string };
+    success: { bg: string; fg: string; border: string };
+    warning: { bg: string; fg: string; border: string };
+    error:   { bg: string; fg: string; border: string };
+  };
+}
+
+export const lightSemantic: Semantic = {
+  bg: {
+    page:             color.light.appBg,
+    surface:          color.light.white,
+    surfaceAlt:       color.light.grey,
+    sunken:           color.grey[100],
+    hover:            color.greyAlpha[50],
+    press:            color.greyAlpha[100],
+    primaryTint:      color.primary[100],
+    primaryTintHover: color.primary[200],
+    scrim:            color.greyAlpha[500],
   },
   text: {
     primary:     color.grey[900],
@@ -663,18 +772,19 @@ export const lightSemantic = {
     warning: { bg: color.yellow[100], fg: color.yellow[700], border: color.yellow[300] },
     error:   { bg: color.red[100],    fg: color.red[800],    border: color.red[300]    },
   },
-} as const;
+};
 
-export const darkSemantic = {
+export const darkSemantic: Semantic = {
   bg: {
-    page:        color.dark.appBg,
-    surface:     color.dark.surface,
-    surfaceAlt:  color.dark.surfaceAlt,
-    sunken:      color.dark.sunken,
-    hover:       color.whiteAlpha[50],
-    press:       color.whiteAlpha[100],
-    primaryTint: "rgba(108, 105, 255, 0.16)",
-    scrim:       "rgba(0, 0, 0, 0.72)",
+    page:             color.dark.appBg,
+    surface:          color.dark.surface,
+    surfaceAlt:       color.dark.surfaceAlt,
+    sunken:           color.dark.sunken,
+    hover:            color.whiteAlpha[50],
+    press:            color.whiteAlpha[100],
+    primaryTint:      "rgba(108, 105, 255, 0.16)",
+    primaryTintHover: "rgba(108, 105, 255, 0.24)",
+    scrim:            "rgba(0, 0, 0, 0.72)",
   },
   text: {
     primary:     color.grey[100],
@@ -700,7 +810,9 @@ export const darkSemantic = {
     warning: { bg: "rgba(255, 190, 61, 0.15)",  fg: color.yellow[300], border: "rgba(255, 190, 61, 0.32)"  },
     error:   { bg: "rgba(254, 116, 117, 0.15)", fg: color.red[300],    border: "rgba(254, 116, 117, 0.32)" },
   },
-} as const;
+};
+
+export type ThemeMode = "light" | "dark";
 
 /**
  * Resolve the active semantic palette from a mode.
@@ -709,11 +821,8 @@ export const darkSemantic = {
  *   const s = resolveTheme(useColorScheme()); // "light" | "dark"
  *   <View style={{ backgroundColor: s.bg.surface, color: s.text.primary }} />
  */
-export type ThemeMode = "light" | "dark";
-export type Semantic = typeof lightSemantic;
-
 export function resolveTheme(mode: ThemeMode): Semantic {
-  return mode === "dark" ? (darkSemantic as unknown as Semantic) : lightSemantic;
+  return mode === "dark" ? darkSemantic : lightSemantic;
 }
 
 // Back-compat alias for code that referenced the original single export.
@@ -1008,8 +1117,11 @@ See `assets/README.md` for the full inventory and the TODO list (standalone symb
 
 ```bash
 # Run from your project root.
+# Replace <SKILL_PATH> with the path to this skill on your machine:
+#   - Project-local install:  .claude/skills/symphony-style-guide
+#   - Global Claude install:  ~/.claude/skills/symphony-style-guide
 mkdir -p public/assets/opera
-cp -R ~/.cursor/skills/opera-design-system/assets/* public/assets/opera/
+cp -R <SKILL_PATH>/assets/* public/assets/opera/
 ```
 
 ### 6.2 HTML — nav header + favicons
@@ -1156,6 +1268,9 @@ interface Props extends Omit<ImageProps, "source"> {
 
 export function Wordmark({ tone = "purple", height = 40, style, ...rest }: Props) {
   return (
+    // Note: `resizeMode` is deprecated in Expo SDK ≥ 50 / expo-image.
+    // If using expo-image, replace `Image` from "react-native" with Image from
+    // "expo-image" and use `contentFit="contain"` prop instead of resizeMode in style.
     <Image
       source={SOURCES[tone]}
       style={[{ height, width: height * 4.48, resizeMode: "contain" }, style]}
@@ -1266,12 +1381,31 @@ struct DSSemantic {
     }
 }
 
-extension EnvironmentValues {
-    /// Usage: `@Environment(\.dsSemantic) private var ds`
-    var dsSemantic: DSSemantic { DSSemantic(scheme: colorScheme) }
+// EnvironmentKey is required for custom environment values (iOS 16 compatible).
+// iOS 17+ alternative: replace this whole block with @Entry on the extension property.
+private struct DSSemanticKey: EnvironmentKey {
+    static let defaultValue = DSSemantic(scheme: .light)
 }
 
-// In a view:
+extension EnvironmentValues {
+    /// Inject in a parent view: `.environment(\.dsSemantic, DSSemantic(scheme: colorScheme))`
+    /// Usage in a child view: `@Environment(\.dsSemantic) private var ds`
+    var dsSemantic: DSSemantic {
+        get { self[DSSemanticKey.self] }
+        set { self[DSSemanticKey.self] = newValue }
+    }
+}
+
+// Inject at the root (e.g. in App or ContentView):
+// struct ContentView: View {
+//     @Environment(\.colorScheme) private var colorScheme
+//     var body: some View {
+//         NavigationStack { /* … */ }
+//             .environment(\.dsSemantic, DSSemantic(scheme: colorScheme))
+//     }
+// }
+//
+// Consume in any child view:
 // struct Card: View {
 //     @Environment(\.dsSemantic) private var ds
 //     var body: some View {
@@ -1281,8 +1415,9 @@ extension EnvironmentValues {
 //     }
 // }
 //
-// To force a mode app-wide, wrap your root in `.preferredColorScheme(.dark)`.
-// To follow system, omit the modifier.
+// Alternatively, skip the environment and read colorScheme directly in each view:
+// @Environment(\.colorScheme) private var colorScheme
+// private var ds: DSSemantic { DSSemantic(scheme: colorScheme) }
 
 enum DSFont {
     static func regular(_ size: CGFloat)  -> Font { .custom("Poppins-Regular",   size: size) }

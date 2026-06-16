@@ -41,7 +41,7 @@ const variants: Record<Variant, string> = {
   primary:
     "bg-bg-primary text-fg-onPrimary hover:bg-bg-primaryHover active:bg-bg-primaryPress disabled:bg-bg-primaryDisabled",
   secondary:
-    "bg-bg-surface text-fg-link border border-stroke-focus hover:bg-bg-primaryTint active:bg-bg-primaryTintHov disabled:text-fg-disabled disabled:border-stroke-default",
+    "bg-bg-surface text-fg-link border border-stroke-focus hover:bg-bg-primaryTint active:bg-bg-primaryTintHover disabled:text-fg-disabled disabled:border-stroke-default",
   ghost:
     "bg-transparent text-fg-body hover:bg-bg-hover active:bg-bg-press disabled:text-fg-disabled",
   destructive:

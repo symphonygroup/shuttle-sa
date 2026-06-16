@@ -1,11 +1,13 @@
 ---
 name: opera-design-system
-description: Symphony's internal design system — canonical color palette, Poppins typography scale, design tokens, brand assets (logo, wordmark, symbol, favicon), and full dark-mode parity for every internal Symphony project. Provides the full grey solid scale, grey alpha (#1A1A24) transparency scale, primary purple (#6C69FF), light surfaces (white, light grey, app background), dark surfaces (#1A1A24 / #22222E / #2A2A36 / #16161F), white-alpha overlay scale, and semantic Red/Yellow/Green/Blue scales; the 12-level Poppins typography system (Heading 1–6, Body L/M/S, Body S Uppercase, Caption M/S) across Regular/Medium/Semibold/Bold (400/500/600/700) at line-height 1.5; the Symphony wordmark in purple/black/white at multiple sizes; and a complete dark-mode system toggled via the .dark class on <html> with semantic-alias overrides for surfaces, text, borders, status, scrim, primary tints, and brand assets. Use whenever building, styling, reviewing, or refactoring any UI in a Symphony project — web, mobile, dashboards, marketing pages, decks, mockups, prototypes — or when choosing colors, fonts, weights, font sizes, setting up Tailwind config, CSS variables, JS/TS design tokens, building a dark mode theme or theme toggle, respecting prefers-color-scheme, embedding the Symphony logo/wordmark/symbol, configuring favicons, or when the user mentions Symphony, the design system, brand colors, brand assets, brand mark, logo, wordmark, symbol, app icon, favicon, lockup, Poppins, dark mode, light mode, theme toggle, color scheme, or product UI tokens.
+description: This skill should be used when building, styling, or reviewing any Symphony internal project UI — when the user asks to "apply the Opera Design System", "use Symphony brand colors", "set up Poppins", "implement dark mode", "configure design tokens", "add a theme toggle", or "embed the Symphony logo". Provides the complete color palette (Primary #6C69FF, full grey scale, semantic aliases), 12-step Poppins typography, dark-mode system (`.dark` class on `<html>`), brand assets (wordmark, symbol, favicon), and ready-to-paste exports for Tailwind v3/v4, CSS variables, TypeScript, JSON, SwiftUI, and React Native. Use whenever choosing colors, font sizes, or weights for Symphony web, mobile, dashboards, marketing pages, decks, or prototypes.
 ---
 
-# Opera — Symphony Design System
+# Opera Design System
 
 The single source of truth for Symphony product UI — colors, typography, design tokens, **and brand assets**. Use these exact tokens and exact assets — do not paraphrase, approximate, substitute hex values, font weights, sizes, or recolor the logo.
+
+> **"Opera"** is the internal codename for the Symphony design system. The `localStorage` key is `opera-theme`, the CSS variable comment prefix is `OPERA`, and install paths reference `opera/`. When users say "Opera" or "Opera Design System" they mean this skill.
 
 This skill is the complete kit for any internal Symphony project. It defines both the **system** (palette, ramp, rules) and the **identity** (logo, wordmark, symbol, favicon).
 
@@ -127,6 +129,8 @@ Use for overlays, scrims, hover/press veils, subtle dividers over imagery.
 | Primary 700 | `#4C4AB3` | Hover state of Primary 500 |
 | Primary 800 | `#333194` | Pressed state of Primary 500 / strong emphasis |
 
+> **Note**: Steps 400 and 600 are intentionally absent from this scale — the jump from 300 to 500 and 500 to 700 is sufficient for the hover/pressed/tint range. Never invent a "Primary 400" or "Primary 600".
+
 ### 2.4 Light Surfaces
 
 | Token | Hex | Role |
@@ -247,6 +251,7 @@ Match intent to token. **Never use raw hex in components**; reference these role
 | Destructive CTA | bg `Red 500` `#FE7475`, hover `Red 700`, pressed `Red 800` | bg `Red 500`, hover `Red 700`, pressed `Red 800` (unchanged) | `bg-destructive` |
 | Focus ring | 2px `Primary 500` `#6C69FF`, 2px offset | 2px `Primary 500` `#6C69FF`, 2px offset (unchanged) | `focus-ring` |
 | Selected row / chip bg | `Primary 100` `#F0F0FF` | `rgba(108,105,255,0.16)` | `bg-primary-tint` |
+| Selected row / chip bg (hover) | `Primary 200` `#E4E4FF` | `rgba(108,105,255,0.24)` | `bg-primary-tint-hover` |
 | Selected row / chip fg | `Primary 800` `#333194` | `Primary 300` `#D3D2FF` | `text-primary-tint` |
 
 ### Status (badges, alerts, toasts)
@@ -283,9 +288,11 @@ For full component examples (Button, Input, Card, Badge, Modal) with the tokens 
 
 ### Primary Button — minimum requirement
 
+> **CSS-only context**: The snippets below use raw hex values because there is no token layer available (plain HTML/CSS). In any project that has the token system installed (Tailwind, CSS vars, or TS tokens), always reference the semantic alias instead.
+
 ```css
 .btn-primary {
-  background-color: #6C69FF;           /* Primary 500 */
+  background-color: #6C69FF;           /* Primary 500 — use var(--color-bg-primary) in token-enabled projects */
   color: #FFFFFF;
   font-family: "Poppins", sans-serif;
   font-size: 14px;                      /* Body M */
@@ -393,10 +400,11 @@ Before considering any UI done, confirm:
 
 ## 8. Files in This Skill
 
-- `SKILL.md` — this file; tokens, rules, brand reference, and dark-mode spec (§10).
-- `tokens.md` — copy-paste exports for Tailwind (with `darkMode: "class"`), CSS variables (with `.dark` override), TypeScript, JSON, SwiftUI, React Native, plus brand-asset embedding snippets and the theme provider / flash-prevention snippet (§8).
+- `SKILL.md` — this file; core tokens, hard rules, brand reference, and quick component examples.
+- `references/dark-mode.md` — full dark-mode spec: how the toggle works, delta cheat-sheet, brand assets under dark, image strategy, accessibility ratios, theme toggle UX, and common PR-review mistakes.
+- `tokens.md` — copy-paste exports for Tailwind v3/v4, CSS custom properties (with `.dark` override), TypeScript, JSON W3C-style, SwiftUI, React Native, brand-asset embedding snippets, and the theme provider + flash-prevention snippet.
 - `usage.md` — component recipes (Button, Input, Badge, Card, Modal, Form, Theme Toggle, image handling) using semantic aliases so they flip with `.dark` automatically.
-- `design-system.html` — single-file live showcase of every token, type style, and component recipe, with a working System / Light / Dark toggle. Open it in a browser to verify changes visually.
+- `design-system.html` — single-file live showcase of every token, type style, and component recipe, with a working System / Light / Dark toggle. Open in a browser to verify changes visually.
 - `assets/` — Symphony brand assets. See `assets/README.md` for the full inventory.
   - `assets/wordmark/` — `symphony-wordmark-{purple,black,white}.png` at full-res + `200w` / `400w` (1×/2×). White variant is the dark-mode default.
   - `assets/symbol/` — standalone "S" mark (SVG + PNG sizes). _TODO — including the dark-mode `-on-dark` variant._
@@ -469,8 +477,10 @@ The standalone "S" mark — used wherever the full wordmark won't fit: favicons,
 
 Full copy-paste snippets live in [`tokens.md`](tokens.md#6-brand-assets) §6. Quick reference:
 
+> **`<picture>` vs React `useTheme()`**: The `<picture>` approach below responds to the OS `prefers-color-scheme` media query — it does **not** follow the user's explicit `opera-theme` preference stored in `localStorage`. If the user has chosen "Dark" in the app but their OS is "Light", `<picture>` shows the purple wordmark instead of the white one. For apps with the `ThemeProvider` wired up (see `tokens.md §8`), use the React `useTheme()` approach instead so the wordmark tracks the user's preference.
+
 ```html
-<!-- Nav header (responsive light/dark) -->
+<!-- Nav header — CSS-only, follows OS preference (not stored opera-theme) -->
 <a href="/" class="brand">
   <picture>
     <source srcset="/assets/opera/wordmark/symphony-wordmark-white-200w.png 1x,
@@ -512,80 +522,14 @@ Full copy-paste snippets live in [`tokens.md`](tokens.md#6-brand-assets) §6. Qu
 
 ## 10. Dark Mode
 
-Opera ships with full dark-mode parity. The system is built so that **components never know which mode is active** — they reference semantic aliases (§3), and a single `.dark` class on `<html>` swaps every alias to its dark value. The raw color scales (Grey, Primary, Red/Yellow/Green/Blue) are **identical** in both modes; only the aliases change.
+Opera ships with full dark-mode parity. Components **never know which mode is active** — they reference semantic aliases (§3), and a single `.dark` class on `<html>` swaps every alias to its dark value. The raw color scales (Grey, Primary, Red/Yellow/Green/Blue) are identical in both modes; only the aliases change.
 
-### 10.1 How it works
+**Key rules:**
+- Toggle: `.dark` class on `<html>`, driven by `localStorage` key `opera-theme` (`system | light | dark`).
+- Raw scales stay fixed. Only semantic aliases redefine inside `.dark`.
+- Tailwind: `darkMode: "class"` — use `dark:` variant only for cases aliases can't cover (swapping `<picture>` source, SVG illustration swap, dark-only screenshot ring).
+- SSR flash prevention: blocking inline `<script>` in `<head>` must read `localStorage` and add `.dark` before first paint.
 
-1. **Toggle**: `.dark` class on the `<html>` element. Driven by a `system | light | dark` user preference persisted to `localStorage` under the key `opera-theme`. When the preference is `system`, the resolved mode follows `prefers-color-scheme`.
-2. **Token shape**: raw scales are fixed. Inside `:root`, semantic aliases (`--color-bg-page`, `--color-text-primary`, …) point at light values. Inside `.dark`, the same aliases are redefined to point at dark values.
-3. **Tailwind**: `darkMode: "class"` in `tailwind.config.{ts,js}`. Use the `dark:` variant only for cases the semantic aliases can't express on their own (e.g. swapping a `<picture>` source, swapping an SVG illustration, applying a dark-only border ring to a screenshot).
-4. **SSR flash prevention**: a tiny blocking `<script>` in `<head>` reads `localStorage.opera-theme`, resolves it against `matchMedia("(prefers-color-scheme: dark)")`, and adds `dark` to `<html>` **before first paint**. Without this you'll get a one-frame flash of the wrong theme on every navigation.
+Full specification — how the toggle works, delta cheat-sheet, brand assets under dark, image strategy, accessibility contrast ratios, theme toggle UX, and common PR-review mistakes — is in **[`references/dark-mode.md`](references/dark-mode.md)**.
 
-Reference implementation (HTML, React Theme Provider, SwiftUI environment) lives in [`tokens.md`](tokens.md#8-theme-provider--flash-prevention) §8.
-
-### 10.2 Dark surface ramp (new raw values)
-
-The only new raw values dark mode introduces are the four surfaces in §2.9 plus the White Alpha scale in §2.10. Don't invent additional dark greys — if a role isn't covered, reuse the existing Grey scale.
-
-| Surface | Hex | When |
-|---------|-----|------|
-| Dark App Background | `#1A1A24` | Page background — `<body>` / app shell. |
-| Dark Surface | `#22222E` | Cards, modals, dropdowns, popovers — first layer above page. |
-| Dark Surface Alt | `#2A2A36` | Zebra rows, secondary surface, sidebar bg, raised pills. |
-| Dark Sunken | `#16161F` | Inset / sunken area (e.g. inside a card, sunken code block). |
-
-The surface hierarchy is **page → surface → surface-alt → on top of surface-alt, go back to surface**. Don't stack more than two levels of depth.
-
-### 10.3 What changes vs. light mode (delta cheat-sheet)
-
-- **Surfaces**: `#FFFFFF` → `#22222E`; `#F6F7FC` → `#1A1A24`; `#FAFAFD` → `#2A2A36`.
-- **Text**: scale inverts — `Grey 900` ↔ `Grey 100`, `Grey 800` ↔ `Grey 300`, `Grey 700` ↔ `Grey 500`.
-- **Borders**: `Grey 300` → `Grey 800`; `Grey 200` → `Grey 900`.
-- **Status badges**: `100/700/300` light pattern becomes alpha-derived dark pattern (`rgba(<500>, 0.15) / <300> / rgba(<500>, 0.32)`) — see §3.
-- **Primary tints**: `Primary 100/200/300` (near-white) become `rgba(108,105,255, 0.16 / 0.24 / 0.32)`.
-- **Scrim**: `Grey Alpha 500` → `rgba(0, 0, 0, 0.72)`.
-- **Veils**: Grey Alpha → White Alpha.
-- **Brand wordmark**: `symphony-wordmark-purple-*.png` → `symphony-wordmark-white-*.png`.
-- **Brand symbol**: `symphony-symbol.svg` → `symphony-symbol-on-dark.svg` (TODO — until shipped, fall back to the white wordmark).
-- **Focus ring & Primary 500 CTA fill**: unchanged in both modes.
-
-### 10.4 Brand assets under dark
-
-| Surface | Asset |
-|---------|-------|
-| Page / nav header (`.dark`) | `assets/wordmark/symphony-wordmark-white-200w.png` + `-400w.png` (srcset) |
-| Mobile nav (collapsed, `.dark`) | `assets/symbol/symphony-symbol-on-dark.svg` (TODO; fallback: white wordmark) |
-| Avatar / loading state (`.dark`) | `assets/symbol/symphony-symbol-on-dark.svg` (TODO) |
-| Favicon (dark browser chrome) | `assets/favicon/favicon-dark.svg` via `<link rel="icon" media="(prefers-color-scheme: dark)" …>` (TODO) |
-| Social `og:image` (dark mode UA hint) | optional `assets/social/og-image-dark-1200x630.png` (TODO) |
-
-Use a `<picture>` element (CSS toggling via `prefers-color-scheme`) **or** swap the `src` in your React `<Wordmark>` component based on the active theme. Either works — pick one and stick to it across the app.
-
-### 10.5 Images, illustrations, and screenshots
-
-- **Photographs**: leave them. No filter, no overlay.
-- **Decorative illustrations / spot art**: ship a dark variant (`illustration-name-dark.svg`) and swap via `<picture>` or React.
-- **Screenshots of light-mode UI shown inside a dark page**: wrap in a 1px `border-default` ring (`Grey 800` `#4F4F58`) to avoid the bright glow effect against the dark surface.
-- **Inline SVG icons using `currentColor`**: nothing to do — they inherit from `text-*` aliases automatically.
-
-### 10.6 Accessibility
-
-- Primary text on `Dark Surface` (`#F9F9FA` on `#22222E`) is ~15.8:1 — passes WCAG AAA.
-- Body text (`#E1E1E6` on `#22222E`) is ~11.4:1 — passes AAA.
-- Secondary text (`#B3B3BA` on `#22222E`) is ~6.6:1 — passes AA.
-- Status fg (`#B1CEFF` on the alpha info bg over `#22222E`) is ~7.1:1 — passes AAA.
-- **Never** rely on color alone for status (info/success/warning/error). Always pair with an icon — colorblind users on dark mode lose more cues than on light.
-
-### 10.7 Theme toggle UX
-
-Standard pattern: a 3-option segmented control labeled **System / Light / Dark**, persisted to `localStorage` as `opera-theme`. The "System" option follows `prefers-color-scheme` and updates live when the OS preference changes (`matchMedia(...).addEventListener("change", …)`). The component recipe is in [`usage.md`](usage.md#theme-toggle).
-
-### 10.8 Common mistakes (reject in PR review)
-
-- Toggling dark mode by editing hex values inside components rather than flipping `.dark`.
-- `filter: invert()` anywhere — destroys brand colors, photos, and screenshots.
-- Using `Primary 100/200/300` as backgrounds on dark surfaces (they're near-white).
-- Using `bg-blue-100` / `bg-green-100` etc. for status badges on dark (almost-white wash).
-- Leaving the purple wordmark on a dark background.
-- Missing the SSR flash-prevention `<script>` — produces a visible one-frame theme flip on first load.
-- Hard-coding the scrim as `rgba(0,0,0,0.5)` in components instead of using the `scrim` alias.
+Complete implementation (theme provider, flash-prevention script, `ThemeToggle` component) is in **[`tokens.md`](tokens.md#8-theme-provider--flash-prevention) §8**.
