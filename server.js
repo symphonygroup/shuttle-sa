@@ -118,12 +118,14 @@ passport.use(
         return done(null, false, { message: 'Only @symphony.is accounts allowed' });
       }
       const driverEmails = (process.env.DRIVER_EMAILS || '').split(',').map(e => e.trim());
+      const managerEmails = (process.env.MANAGER_EMAILS || '').split(',').map(e => e.trim());
       const user = {
         id: profile.id,
         displayName: profile.displayName,
         email,
         photo: profile.photos?.[0]?.value,
-        isDriver: driverEmails.includes(email)
+        isDriver: driverEmails.includes(email),
+        isManager: managerEmails.includes(email)
       };
       if (!isProd) console.log('[auth] Login success:', email);
       return done(null, user);
@@ -236,7 +238,14 @@ io.on('connection', socket => {
     if (!user.isDriver) return;
     const { tourId, lat, lng } = data || {};
     if (!TOURS[tourId] || lat == null || lng == null) return;
-    driverLocations[tourId] = { lat, lng, timestamp: Date.now() };
+    driverLocations[tourId] = {
+      tourId,
+      name: TOURS[tourId].name,
+      departureTime: TOURS[tourId].departureTime,
+      lat,
+      lng,
+      timestamp: Date.now()
+    };
     io.to(tourId).emit('driverLocation', driverLocations[tourId]);
   });
 
@@ -244,7 +253,7 @@ io.on('connection', socket => {
   socket.on('driverStopSharing', tourId => {
     if (!user.isDriver || !TOURS[tourId]) return;
     delete driverLocations[tourId];
-    io.to(tourId).emit('driverLocationStopped');
+    io.to(tourId).emit('driverLocationStopped', { tourId });
   });
 
   // Chat message — always global, no tour selection required

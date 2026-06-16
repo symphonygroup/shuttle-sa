@@ -381,12 +381,70 @@ body {
   background: var(--muted);
 }
 
-#map {
+.map-wrap {
+  position: relative;
   height: calc(100dvh - var(--nav-h) - var(--tabs-h) - 130px);
   min-height: 300px;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--border);
+}
+#map {
+  height: 100%;
+  width: 100%;
+}
+.map-tour-overlay {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(15, 17, 23, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+.map-tour-overlay.hidden {
+  display: none;
+}
+.map-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  background: var(--surface);
+}
+.map-empty.hidden {
+  display: none;
+}
+.map-empty-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+  filter: grayscale(0.3);
+}
+.map-empty-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.map-empty-sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+  max-width: 22rem;
+  line-height: 1.5;
 }
 
 /* MESSAGES */
@@ -827,6 +885,39 @@ body {
   font-size: 0.75rem;
   font-weight: 800;
   line-height: 1;
+}
+.seat--guest {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.5);
+}
+.seat--guest .seat-initials {
+  font-size: 0.85rem;
+}
+.guest-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 6px;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+.manager-hint {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin-bottom: 1rem;
+}
+.manager-hint.hidden {
+  display: none;
 }
 .driver-reset-btn {
   margin-top: 1rem;

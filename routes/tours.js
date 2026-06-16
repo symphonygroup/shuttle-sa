@@ -1,3 +1,6 @@
+// NOTE: morning1 and morning2 have the same stops
+// NOTE: afternoon1 and afternoon2 have different stops
+
 const TOURS = {
   morning1: {
     id: 'morning1',
@@ -5,11 +8,13 @@ const TOURS = {
     departureTime: '07:40',
     direction: 'toOffice',
     stops: [
+      'Dobrinja',
+      'Stup petlja',
       'Stup',
-      'Nedžarići/Agram',
-      'Alipašino/Addiko',
+      'Kralj Fahd (Brkić petrol)',
+      'Nedžarići',
       'RTV',
-      'Otoka-bazen',
+      'Otoka (bazen)',
       'Otoka',
       'Čengić Vila',
       'Malta',
@@ -18,8 +23,8 @@ const TOURS = {
       'Muzej',
       'SCC',
       'Skenderija',
-      'Šumarski fakultet',
-      'Vraće/Nešković',
+      'Šumarski fakultet (Zagrebačka)',
+      'Vrace (Nešković pumpa)',
       'Office'
     ]
   },
@@ -30,12 +35,12 @@ const TOURS = {
     direction: 'toOffice',
     stops: [
       'Dobrinja',
-      'Mojmilo',
+      'Stup petlja',
       'Stup',
-      'Nedžarići/Agram',
-      'Alipašino/Addiko',
+      'Kralj Fahd (Brkić petrol)',
+      'Nedžarići',
       'RTV',
-      'Otoka-bazen',
+      'Otoka (bazen)',
       'Otoka',
       'Čengić Vila',
       'Malta',
@@ -44,8 +49,8 @@ const TOURS = {
       'Muzej',
       'SCC',
       'Skenderija',
-      'Šumarski fakultet',
-      'Vraće/Nešković',
+      'Šumarski fakultet (Zagrebačka)',
+      'Vrace (Nešković pumpa)',
       'Office'
     ]
   },
@@ -56,21 +61,16 @@ const TOURS = {
     direction: 'fromOffice',
     stops: [
       'Office',
-      'Vraće/Nešković',
-      'Šumarski fakultet',
+      'Vrace (Nešković pumpa)',
+      'Šumarski fakultet (Zagrebačka)',
       'Skenderija',
       'SCC',
-      'Muzej',
+      'Grbavica 1',
       'Pofalići',
-      'Socijalno',
-      'Malta',
-      'Čengić Vila',
-      'Otoka',
-      'Otoka-bazen',
-      'RTV',
-      'Alipašino/Addiko',
-      'Nedžarići/Agram',
-      'Stup'
+      'Grbavica (stadion)',
+      'Hrasno brdo (kružni tok)',
+      'Hrasno (Azize Šaćirbegović)',
+      'Otoka (pijaca)'
     ]
   },
   afternoon2: {
@@ -80,23 +80,19 @@ const TOURS = {
     direction: 'fromOffice',
     stops: [
       'Office',
-      'Vraće/Nešković',
-      'Šumarski fakultet',
+      'Vrace (Nešković pumpa)',
+      'Šumarski fakultet (Zagrebačka)',
       'Skenderija',
       'SCC',
-      'Muzej',
+      'Grbavica 1',
       'Pofalići',
-      'Socijalno',
-      'Malta',
-      'Čengić Vila',
-      'Otoka',
-      'Otoka-bazen',
+      'Grbavica (stadion)',
+      'Hrasno brdo (kružni tok)',
+      'Otoka (Capital)',
+      'Otoka (bazen)',
       'RTV',
-      'Alipašino/Addiko',
-      'Nedžarići/Agram',
-      'Stup',
-      'Mojmilo',
-      'Dobrinja'
+      'Nedžarići',
+      'Stup'
     ]
   }
 };

@@ -23,6 +23,7 @@ router.get('/tours', ensureAuthenticated, (req, res) => {
     const tourReservations = db.getReservationsForTour(tour.id);
     const seats = {};
     const seatNames = {};
+    const seatGuests = {};
     for (let i = 1; i <= TOTAL_SEATS; i++) {
       const res_user = tourReservations[i];
       if (!res_user) {
@@ -34,12 +35,14 @@ router.get('/tours', ensureAuthenticated, (req, res) => {
         seats[i] = 'taken';
         seatNames[i] = res_user.userName;
       }
+      if (res_user?.guest) seatGuests[i] = true;
     }
     const myReservation = Object.entries(tourReservations).find(([, r]) => r.userId === userId);
     return {
       ...tour,
       seats,
       seatNames,
+      seatGuests,
       myReservation: myReservation
         ? { seatNumber: parseInt(myReservation[0], 10), stop: myReservation[1].stop }
         : null,
@@ -70,35 +73,40 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
   try {
     const tourReservations = db.getReservationsForTour(tourId);
 
-    const existing = Object.entries(tourReservations).find(([, r]) => r.userId === userId);
-    if (existing)
-      return res
-        .status(400)
-        .json({ error: 'Već imaš rezervaciju na ovoj turi', seat: parseInt(existing[0], 10) });
+    // Managers may book multiple seats (for guests who can't log in); skip per-user limits.
+    if (!req.user.isManager) {
+      const existing = Object.entries(tourReservations).find(([, r]) => r.userId === userId);
+      if (existing)
+        return res
+          .status(400)
+          .json({ error: 'Već imaš rezervaciju na ovoj turi', seat: parseInt(existing[0], 10) });
 
-    // Check group limit: 1 morning tour + 1 afternoon tour per user
-    const morningTours = ['morning1', 'morning2'];
-    const afternoonTours = ['afternoon1', 'afternoon2'];
-    const group = morningTours.includes(tourId) ? morningTours : afternoonTours;
-    const sibling = group.find(id => id !== tourId);
-    if (sibling) {
-      const siblingReservations = db.getReservationsForTour(sibling);
-      const siblingExisting = Object.entries(siblingReservations).find(
-        ([, r]) => r.userId === userId
-      );
-      if (siblingExisting) {
-        const label = morningTours.includes(tourId) ? 'jutarnjoj' : 'popodnevnoj';
-        return res.status(400).json({ error: `Već imaš rezervaciju u drugoj ${label} turi` });
+      // Check group limit: 1 morning tour + 1 afternoon tour per user
+      const morningTours = ['morning1', 'morning2'];
+      const afternoonTours = ['afternoon1', 'afternoon2'];
+      const group = morningTours.includes(tourId) ? morningTours : afternoonTours;
+      const sibling = group.find(id => id !== tourId);
+      if (sibling) {
+        const siblingReservations = db.getReservationsForTour(sibling);
+        const siblingExisting = Object.entries(siblingReservations).find(
+          ([, r]) => r.userId === userId
+        );
+        if (siblingExisting) {
+          const label = morningTours.includes(tourId) ? 'jutarnjoj' : 'popodnevnoj';
+          return res.status(400).json({ error: `Već imaš rezervaciju u drugoj ${label} turi` });
+        }
       }
     }
 
     if (tourReservations[seatNumber])
       return res.status(400).json({ error: 'Sjedište je već zauzeto' });
 
+    const guest = !!req.user.isManager;
     db.reserve(tourId, seatNumber, {
       userId,
       userName,
       stop,
+      guest,
       reservedAt: new Date().toISOString()
     });
 
@@ -107,7 +115,8 @@ router.post('/reserve', writeLimiter, ensureAuthenticated, (req, res) => {
       seatNumber,
       status: 'taken',
       userName,
-      stop
+      stop,
+      guest
     });
 
     res.json({ success: true, tourId, seatNumber, stop });
@@ -151,7 +160,7 @@ function buildManifest(tourId) {
 
   Object.entries(tourReservations).forEach(([seat, r]) => {
     if (!byStop[r.stop]) byStop[r.stop] = [];
-    byStop[r.stop].push({ seat: parseInt(seat, 10), userName: r.userName });
+    byStop[r.stop].push({ seat: parseInt(seat, 10), userName: r.userName, guest: !!r.guest });
   });
 
   // Order by tour stop sequence (driver pickup order)
