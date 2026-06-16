@@ -218,6 +218,10 @@ function initTabs() {
       btn.classList.add('active');
       document.getElementById(`tab-${tab}`).classList.add('active');
       if (tab === 'map' && map) setTimeout(() => map.invalidateSize(), 100);
+      if (tab === 'messages') {
+        const box = document.getElementById('messagesBox');
+        box.scrollTop = box.scrollHeight;
+      }
     });
   });
 }
@@ -915,7 +919,7 @@ async function initPushNotifications() {
     registerPushSubscription();
     return;
   }
-  if (Notification.permission === 'default') {
+  if (Notification.permission === 'default' && !localStorage.getItem('pushDismissed')) {
     const banner = document.getElementById('notifyBanner');
     banner.classList.remove('hidden');
     document.getElementById('enableNotify').addEventListener('click', async () => {
@@ -924,6 +928,7 @@ async function initPushNotifications() {
       if (perm === 'granted') registerPushSubscription();
     });
     document.getElementById('dismissNotify').addEventListener('click', () => {
+      localStorage.setItem('pushDismissed', '1');
       banner.classList.add('hidden');
     });
   }
