@@ -1,6 +1,6 @@
 ---
 description: Research a feature/task and write a plan to .claude/CURRENT.md
-argument-hint: <what you are building>
+argument-hint: <explain what needs to be done!>
 ---
 
 # /specify — produce the plan
