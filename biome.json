@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/node_modules", "!**/data", "!**/public/sw.js"]
+    "includes": ["**", "!**/node_modules", "!**/data", "!**/public/sw.js", "!**/.claude/skills"]
   },
   "formatter": {
     "enabled": true,

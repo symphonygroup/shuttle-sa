@@ -3,28 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#F6F7FC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1A1A24" media="(prefers-color-scheme: dark)">
 <title>Symphony Shuttle — Prijava</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --accent: #4f8ef7;
-    --accent-dark: #3a6fd8;
-    --text: #e8eaf0;
-    --muted: #6b7280;
-    --border: #2d3142;
+    --bg: #F6F7FC;
+    --surface: #FFFFFF;
+    --accent: #6C69FF;
+    --accent-dark: #4C4AB3;
+    --text: #33333C;
+    --text-body: #4F4F58;
+    --muted: #62626E;
+    --border: #E1E1E6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1A1A24;
+      --surface: #22222E;
+      --text: #F9F9FA;
+      --text-body: #E1E1E6;
+      --muted: #B3B3BA;
+      --border: #4F4F58;
+    }
   }
   body {
     background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--text-body);
+    font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0;
     min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 1.5rem;
+    -webkit-font-smoothing: antialiased;
   }
   .card {
     background: var(--surface);
@@ -41,25 +62,29 @@
     display: block;
   }
   h1 {
-    font-size: 1.6rem;
+    font-size: 20px;
     font-weight: 700;
+    color: var(--text);
     margin-bottom: 0.25rem;
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
   }
   .subtitle {
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: 13px;
     margin-bottom: 2rem;
   }
   .error-msg {
-    background: rgba(239,68,68,0.12);
-    border: 1px solid rgba(239,68,68,0.3);
-    color: #f87171;
+    background: rgba(254, 116, 117, 0.1);
+    border: 1px solid rgba(254, 116, 117, 0.3);
+    color: #C74A52;
     border-radius: 10px;
     padding: 0.75rem 1rem;
-    font-size: 0.85rem;
+    font-size: 13px;
     margin-bottom: 1.5rem;
     display: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    .error-msg { color: #FFD5D6; }
   }
   .error-msg.show { display: block; }
   .google-btn {
@@ -68,11 +93,12 @@
     justify-content: center;
     gap: 0.75rem;
     background: var(--accent);
-    color: #fff;
+    color: #FFFFFF;
     text-decoration: none;
     border-radius: 12px;
     padding: 0.9rem 1.5rem;
-    font-size: 1rem;
+    font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
     font-weight: 600;
     transition: background 0.15s, transform 0.1s;
     width: 100%;
@@ -81,11 +107,11 @@
   .google-btn svg { flex-shrink: 0; }
   .domain-note {
     margin-top: 1.25rem;
-    font-size: 0.82rem;
+    font-size: 12px;
     color: var(--muted);
   }
   .domain-note span {
-    background: rgba(79,142,247,0.12);
+    background: rgba(108, 105, 255, 0.12);
     color: var(--accent);
     padding: 0.1em 0.4em;
     border-radius: 4px;

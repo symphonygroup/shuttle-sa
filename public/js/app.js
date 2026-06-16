@@ -277,14 +277,26 @@ async function loadTours() {
   document.getElementById('rideDateLabel').textContent = getRideDate();
   const grid = document.getElementById('toursGrid');
   grid.innerHTML = '';
-  tours.forEach(tour => {
-    const card = document.createElement('div');
-    card.className = 'tour-card';
-    card.id = `tour-card-${tour.id}`;
-    card.addEventListener('click', () => openModal(tour));
-    grid.appendChild(card);
-    renderTourCard(tour);
-    socket.emit('joinTour', tour.id);
+  const morning = tours.filter(t => t.direction === 'toOffice');
+  const afternoon = tours.filter(t => t.direction === 'fromOffice');
+  [
+    { label: 'Jutarnje ture', items: morning },
+    { label: 'Popodnevne ture', items: afternoon }
+  ].forEach(({ label, items }) => {
+    if (!items.length) return;
+    const h = document.createElement('div');
+    h.className = 'tour-group-label';
+    h.textContent = label;
+    grid.appendChild(h);
+    items.forEach(tour => {
+      const card = document.createElement('div');
+      card.className = 'tour-card';
+      card.id = `tour-card-${tour.id}`;
+      card.addEventListener('click', () => openModal(tour));
+      grid.appendChild(card);
+      renderTourCard(tour);
+      socket.emit('joinTour', tour.id);
+    });
   });
 }
 
