@@ -1,6 +1,6 @@
 ---
 description: Implement the plan in .claude/CURRENT.md end-to-end, verify, push, output PR text
-argument-hint: (none — branch derived from plan title)
+argument-hint: no arguments, review .claude/CURRENT.md what will be used here
 ---
 
 # /implement — build the plan
