@@ -7,8 +7,10 @@ let pendingCancelSeat = null; // seat whose cancel panel is shown (managers: any
 let socket = null;
 let map = null;
 let busMarker = null;
+let mapCenteredOnReveal = false;
 let driverWatchId = null;
 let activeDriverTourId = null;
+let sharingTourId = null; // tour the live GPS share is actually pinned to (may differ from the dropdown)
 let manifestTourId = null;
 
 const TOTAL_SEATS = 19;
@@ -217,10 +219,14 @@ function initTabs() {
       });
       btn.classList.add('active');
       document.getElementById(`tab-${tab}`).classList.add('active');
-      if (tab === 'map' && map) setTimeout(() => map.invalidateSize(), 100);
+      if (tab === 'map' && map) setTimeout(recenterMapOnReveal, 100);
       if (tab === 'messages') {
         const box = document.getElementById('messagesBox');
         box.scrollTop = box.scrollHeight;
+      }
+      if (tab === 'driver') {
+        const box = document.getElementById('driverMessagesBox');
+        if (box) box.scrollTop = box.scrollHeight;
       }
     });
   });
@@ -617,6 +623,10 @@ async function doReserve() {
     showToast('❌ Odaberi stanicu', 'error');
     return;
   }
+  // Capture the requested tour/seat — activeTour/selectedSeat can change while the
+  // request is in flight (modal closed/reopened on a different tour mid-request).
+  const tourId = activeTour.id;
+  const bookedSeat = selectedSeat;
   const btn = document.getElementById('reserveBtn');
   btn.disabled = true;
   btn.textContent = 'Rezervišem...';
@@ -625,7 +635,7 @@ async function doReserve() {
     const res = await fetch('/api/reserve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tourId: activeTour.id, seatNumber: selectedSeat, stop })
+      body: JSON.stringify({ tourId, seatNumber: bookedSeat, stop })
     });
     if (res.redirected || res.status === 401) {
       showToast('❌ Sesija istekla — prijavite se ponovo', 'error');
@@ -634,8 +644,7 @@ async function doReserve() {
     }
     const data = await res.json();
     if (data.success) {
-      const tour = tours.find(t => t.id === activeTour.id);
-      const bookedSeat = selectedSeat;
+      const tour = tours.find(t => t.id === tourId);
       if (tour) {
         tour.seats[bookedSeat] = 'mine';
         if (!tour.seatNames) tour.seatNames = {};
@@ -644,15 +653,20 @@ async function doReserve() {
           // Guest booking — keep modal open so the manager can book more seats.
           if (!tour.seatGuests) tour.seatGuests = {};
           tour.seatGuests[bookedSeat] = true;
-          selectedSeat = null;
-          document.getElementById('stopSelector').classList.add('hidden');
         } else {
           tour.myReservation = { seatNumber: bookedSeat, stop };
         }
-        activeTour = tour;
-        renderSeatGrid(tour);
-        updateModalPanels(tour);
         renderTourCard(tour);
+        // Only touch the modal/selection state if it's still showing this same tour.
+        if (activeTour?.id === tourId) {
+          if (currentUser.isManager) {
+            selectedSeat = null;
+            document.getElementById('stopSelector').classList.add('hidden');
+          }
+          activeTour = tour;
+          renderSeatGrid(tour);
+          updateModalPanels(tour);
+        }
       }
       showToast(`✅ Rezervisano sjedište ${bookedSeat} na ${stop}`);
     } else {
@@ -670,9 +684,12 @@ async function doReserve() {
 async function doCancel() {
   const seatNumber = pendingCancelSeat ?? activeTour?.myReservation?.seatNumber;
   if (!activeTour || seatNumber == null) return;
+  // Capture the requested tour — activeTour can change while the request is in
+  // flight (modal closed/reopened on a different tour mid-request).
+  const tourId = activeTour.id;
   let data;
   try {
-    const res = await fetch(`/api/reserve/${activeTour.id}/${seatNumber}`, { method: 'DELETE' });
+    const res = await fetch(`/api/reserve/${tourId}/${seatNumber}`, { method: 'DELETE' });
     if (res.redirected || res.status === 401) {
       showToast('❌ Sesija istekla — prijavite se ponovo', 'error');
       setTimeout(() => (window.location.href = '/login'), 1500);
@@ -685,17 +702,20 @@ async function doCancel() {
     return;
   }
   if (data.success) {
-    const tour = tours.find(t => t.id === activeTour.id);
+    const tour = tours.find(t => t.id === tourId);
     if (tour) {
       delete tour.seats[seatNumber];
       if (tour.seatNames) delete tour.seatNames[seatNumber];
       if (tour.seatGuests) delete tour.seatGuests[seatNumber];
       if (tour.myReservation?.seatNumber === seatNumber) tour.myReservation = null;
-      pendingCancelSeat = null;
-      activeTour = tour;
-      renderSeatGrid(tour);
-      updateModalPanels(tour);
       renderTourCard(tour);
+      // Only touch the modal/pending-cancel state if it's still showing this same tour.
+      if (activeTour?.id === tourId) {
+        pendingCancelSeat = null;
+        activeTour = tour;
+        renderSeatGrid(tour);
+        updateModalPanels(tour);
+      }
     }
     showToast('Rezervacija otkazana');
   } else {
@@ -723,7 +743,7 @@ function showActiveRide(loc) {
     overlay.classList.remove('hidden');
   }
   if (empty) empty.classList.add('hidden');
-  if (map) setTimeout(() => map.invalidateSize(), 50);
+  if (map) setTimeout(recenterMapOnReveal, 50);
 }
 
 function showNoRide() {
@@ -731,6 +751,20 @@ function showNoRide() {
   const empty = document.getElementById('mapEmpty');
   if (overlay) overlay.classList.add('hidden');
   if (empty) empty.classList.remove('hidden');
+  mapCenteredOnReveal = false;
+}
+
+// Leaflet computes pixel bounds against the container's current size — if the
+// map tab is hidden (display:none) when a marker first appears or setView runs,
+// the resulting center is wrong even after a later invalidateSize(). Only
+// recenter once the map tab is actually visible, then never fight a manual pan/zoom.
+function recenterMapOnReveal() {
+  if (!map || !busMarker || mapCenteredOnReveal) return;
+  const mapTab = document.getElementById('tab-map');
+  if (mapTab && !mapTab.classList.contains('active')) return;
+  map.invalidateSize();
+  map.setView(busMarker.getLatLng(), map.getZoom());
+  mapCenteredOnReveal = true;
 }
 
 // ── Messages ───────────────────────────────────────────────────────────────
@@ -794,9 +828,12 @@ function appendMessage(msg, skipScroll = false, boxId = 'messagesBox') {
   if (!skipScroll) box.scrollTop = box.scrollHeight;
 }
 
-function playDing() {
+let dingAudioCtx = null;
+
+function playDingTone() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!dingAudioCtx) dingAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = dingAudioCtx;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -808,8 +845,16 @@ function playDing() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.3);
   } catch (e) {
-    console.warn('playDing failed:', e);
+    console.warn('playDingTone failed:', e);
   }
+}
+
+function playDing() {
+  const audio = new Audio('/sounds/driver-alert.mp3');
+  audio.play().catch(e => {
+    console.warn('driver-alert.mp3 playback failed, falling back to tone:', e);
+    playDingTone();
+  });
 }
 
 // ── Driver Panel ───────────────────────────────────────────────────────────
@@ -848,15 +893,26 @@ function sendDriverMessage() {
 
 async function doDriverReset() {
   if (!confirm('Resetovati sve rezervacije?')) return;
-  const res = await fetch('/api/driver/reset', { method: 'POST' });
-  const data = await res.json();
-  if (data.success) showToast('Sve rezervacije su resetovane');
-  else showToast('❌ Greška pri resetovanju', 'error');
+  try {
+    const res = await fetch('/api/driver/reset', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) showToast('Sve rezervacije su resetovane');
+    else showToast('❌ Greška pri resetovanju', 'error');
+  } catch (e) {
+    showToast('❌ Greška pri resetovanju', 'error');
+    console.error('Driver reset error:', e);
+  }
 }
 
 async function loadPassengers(tourId) {
-  const res = await fetch(`/api/driver/passengers/${tourId}`);
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch(`/api/driver/passengers/${tourId}`);
+    data = await res.json();
+  } catch (e) {
+    console.error('loadPassengers failed:', e);
+    return;
+  }
   const container = document.getElementById('passengerList');
   if (!data.passengers?.length) {
     container.innerHTML =
@@ -894,14 +950,16 @@ function startSharingLocation() {
   }
   document.getElementById('startLocBtn').classList.add('hidden');
   document.getElementById('stopLocBtn').classList.remove('hidden');
-  document.getElementById('locStatus').innerHTML =
-    '<span class="status-dot online"></span> Dijeljenje lokacije aktivno';
 
-  const tourId = activeDriverTourId;
+  sharingTourId = activeDriverTourId;
+  const tourName = tours.find(t => t.id === sharingTourId)?.name || sharingTourId;
+  document.getElementById('locStatus').innerHTML =
+    `<span class="status-dot online"></span> Dijeljenje lokacije aktivno · ${escapeHtml(tourName)}`;
+
   driverWatchId = navigator.geolocation.watchPosition(
     pos => {
       socket.emit('driverLocation', {
-        tourId,
+        tourId: sharingTourId,
         lat: pos.coords.latitude,
         lng: pos.coords.longitude
       });
@@ -917,7 +975,8 @@ function startSharingLocation() {
 function stopSharingLocation() {
   if (driverWatchId != null) navigator.geolocation.clearWatch(driverWatchId);
   driverWatchId = null;
-  socket.emit('driverStopSharing', activeDriverTourId);
+  socket.emit('driverStopSharing', sharingTourId);
+  sharingTourId = null;
   document.getElementById('stopLocBtn').classList.add('hidden');
   document.getElementById('startLocBtn').classList.remove('hidden');
   document.getElementById('locStatus').innerHTML =

@@ -98,11 +98,13 @@ app.use(sessionMiddleware);
 app.use(passport.initialize());
 app.use(passport.session());
 
-console.log('[auth] GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'set' : 'MISSING');
-console.log(
-  '[auth] GOOGLE_CALLBACK_URL:',
-  process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback'
-);
+if (!isProd) {
+  console.log('[auth] GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'set' : 'MISSING');
+  console.log(
+    '[auth] GOOGLE_CALLBACK_URL:',
+    process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback'
+  );
+}
 
 passport.use(
   new GoogleStrategy(
@@ -191,6 +193,7 @@ app.get('/', ensureAuthenticated, (_req, res) => {
 
 // Socket.io
 const driverLocations = {};
+const driverSocketByTour = {}; // tourId -> socket.id currently sharing, for disconnect cleanup
 const MAX_MSG_LEN = 500;
 
 // Attach session, then require an authenticated user for every socket.
@@ -237,7 +240,7 @@ io.on('connection', socket => {
   socket.on('driverLocation', data => {
     if (!user.isDriver) return;
     const { tourId, lat, lng } = data || {};
-    if (!TOURS[tourId] || lat == null || lng == null) return;
+    if (!TOURS[tourId] || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
     driverLocations[tourId] = {
       tourId,
       name: TOURS[tourId].name,
@@ -246,6 +249,7 @@ io.on('connection', socket => {
       lng,
       timestamp: Date.now()
     };
+    driverSocketByTour[tourId] = socket.id;
     io.to(tourId).emit('driverLocation', driverLocations[tourId]);
   });
 
@@ -253,15 +257,27 @@ io.on('connection', socket => {
   socket.on('driverStopSharing', tourId => {
     if (!user.isDriver || !TOURS[tourId]) return;
     delete driverLocations[tourId];
+    if (driverSocketByTour[tourId] === socket.id) delete driverSocketByTour[tourId];
     io.to(tourId).emit('driverLocationStopped', { tourId });
+  });
+
+  // Driver disconnected (tab closed, network loss) without clicking Stop —
+  // clear any tour this socket was actively sharing so riders don't see a frozen ghost bus.
+  socket.on('disconnect', () => {
+    for (const [tourId, sharerId] of Object.entries(driverSocketByTour)) {
+      if (sharerId === socket.id) {
+        delete driverLocations[tourId];
+        delete driverSocketByTour[tourId];
+        io.to(tourId).emit('driverLocationStopped', { tourId });
+      }
+    }
   });
 
   // Chat message — always global, no tour selection required
   socket.on('sendMessage', data => {
     const text = (data?.text || '').toString().trim().slice(0, MAX_MSG_LEN);
-    const userName = (data?.userName || '').toString().trim();
-    if (!text || !userName) return;
-    const msg = db.saveMessage('global', { text, userName });
+    if (!text) return;
+    const msg = db.saveMessage('global', { text, userName: user.displayName });
     io.to('global').emit('newMessage', msg);
     // Real-time alert to all connected drivers
     io.to('driver-inbox').emit('driverAlert', msg);
