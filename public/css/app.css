@@ -707,6 +707,10 @@ body {
 .loc-btn.hidden {
   display: none;
 }
+.loc-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .passenger-stop {
   background: var(--surface);

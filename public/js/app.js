@@ -867,8 +867,11 @@ function initDriverTourSelect() {
     opt.textContent = `${t.name} · ${t.departureTime}`;
     sel.appendChild(opt);
   });
+  const startBtn = document.getElementById('startLocBtn');
+  startBtn.disabled = true;
   sel.addEventListener('change', () => {
     activeDriverTourId = sel.value;
+    startBtn.disabled = !activeDriverTourId;
     if (activeDriverTourId) loadPassengers(activeDriverTourId);
     else document.getElementById('passengerList').innerHTML = '';
   });
@@ -944,6 +947,10 @@ async function loadPassengers(tourId) {
 }
 
 function startSharingLocation() {
+  if (!activeDriverTourId) {
+    showToast('Odaberi turu prije dijeljenja lokacije', 'error');
+    return;
+  }
   if (!navigator.geolocation) {
     showToast('GPS nije dostupan', 'error');
     return;
