@@ -711,6 +711,11 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.loc-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
 
 .passenger-stop {
   background: var(--surface);
