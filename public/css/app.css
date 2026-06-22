@@ -216,6 +216,7 @@ body {
 
 /* TOUR GROUP LABELS — Jutarnje/Popodnevne */
 .tour-group-label {
+  grid-column: 1 / -1;
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
