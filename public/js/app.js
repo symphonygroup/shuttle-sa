@@ -64,6 +64,14 @@ const TOTAL_SEATS = 19;
 function initSocket() {
   socket = io();
 
+  // Surface connection drops so drivers/riders know GPS + chat may be stale
+  socket.on('disconnect', () => {
+    document.getElementById('connBanner').classList.remove('hidden');
+  });
+  socket.on('connect', () => {
+    document.getElementById('connBanner').classList.add('hidden');
+  });
+
   // Re-join rooms after a dropped connection is restored
   socket.io.on('reconnect', () => {
     tours.forEach(t => {
