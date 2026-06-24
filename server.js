@@ -291,13 +291,24 @@ io.on('connection', socket => {
   });
 });
 
-// Cron: Reset reservations at 11:00
+// Cron: Reset morning reservations at 10:00 (after morning1/2 last departure 08:40)
 cron.schedule(
-  '0 11 * * *',
+  '0 10 * * *',
   () => {
-    db.resetAllReservations();
+    db.resetReservationsForTours(['morning1', 'morning2']);
     io.emit('reservationsReset');
-    console.log('Reservations reset at 11:00');
+    console.log('Morning reservations reset at 10:00');
+  },
+  { timezone: 'Europe/Sarajevo' }
+);
+
+// Cron: Reset afternoon reservations at 18:30 (after afternoon1/2 last departure 17:30)
+cron.schedule(
+  '30 18 * * *',
+  () => {
+    db.resetReservationsForTours(['afternoon1', 'afternoon2']);
+    io.emit('reservationsReset');
+    console.log('Afternoon reservations reset at 18:30');
   },
   { timezone: 'Europe/Sarajevo' }
 );

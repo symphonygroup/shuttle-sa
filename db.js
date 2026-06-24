@@ -50,6 +50,12 @@ function resetAllReservations() {
   writeDB(db);
 }
 
+function resetReservationsForTours(tourIds) {
+  const db = readDB();
+  for (const id of tourIds) delete db.reservations[id];
+  writeDB(db);
+}
+
 function addPushSubscription(userId, subscription) {
   const db = readDB();
   if (!Array.isArray(db.pushSubscriptions)) db.pushSubscriptions = [];
@@ -103,6 +109,7 @@ module.exports = {
   reserve,
   cancelReservation,
   resetAllReservations,
+  resetReservationsForTours,
   addPushSubscription,
   getAllPushSubscriptions,
   removePushSubscription,
