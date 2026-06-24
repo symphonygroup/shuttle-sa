@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guide for Claude Code (claude.ai/code) working in this repo.
 
 ## Commands
 
@@ -13,11 +13,11 @@ npm run lint     # biome lint . (lint rules only, no format check)
 npm run format   # biome format --write . (opt-in; do NOT mass-reformat untouched files)
 ```
 
-No build step. No tests. Frontend is raw JS/HTML served statically — changes take effect on page reload. Linter/formatter is **Biome v2** (`biome.json`); only `recommended` rules plus `a11y.useValidLang: off` (Biome's valid-language list lacks `bs`/Bosnian, a valid ISO 639-1 code used by the UI).
+No build step. No tests. Frontend raw JS/HTML served static — changes live on reload. Linter/formatter **Biome v2** (`biome.json`); only `recommended` rules + `a11y.useValidLang: off` (Biome's valid-language list lacks `bs`/Bosnian, valid ISO 639-1 code used by UI).
 
-## Required environment variables
+## Required env vars
 
-Copy to `.env` before running:
+Copy to `.env` before run:
 
 ```
 GOOGLE_CLIENT_ID=
@@ -31,63 +31,63 @@ VAPID_PRIVATE_KEY=
 VAPID_EMAIL=mailto:admin@symphony.is
 ```
 
-Generate VAPID keys: `node -e "const wp=require('web-push'); const k=wp.generateVAPIDKeys(); console.log(JSON.stringify(k,null,2));"`
+Gen VAPID keys: `node -e "const wp=require('web-push'); const k=wp.generateVAPIDKeys(); console.log(JSON.stringify(k,null,2));"`
 
-In **production** (`NODE_ENV=production`) the server fails fast at boot if `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, or `SESSION_SECRET` are missing (dev only warns). VAPID missing only disables push (no crash).
+In **production** (`NODE_ENV=production`) server fails fast at boot if `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, or `SESSION_SECRET` missing (dev only warns). VAPID missing only disables push (no crash).
 
 ## Architecture
 
-**Backend** (`server.js`): Express + Socket.io on a single HTTP server. Session via `express-session` with `session-file-store` in **both** dev and prod (`./data/sessions`) — prod requires a persistent volume on `./data` or sessions are lost on redeploy. Cookie `secure` is on only in prod. Passport Google OAuth restricts login to `@symphony.is` emails. Driver role is env-var-driven (`DRIVER_EMAILS`); manager role likewise (`MANAGER_EMAILS`). Both flags (`isDriver`/`isManager`) live on the session user, set at login — **changing env emails requires re-login to take effect** (old sessions keep their old flags).
+**Backend** (`server.js`): Express + Socket.io, single HTTP server. Session via `express-session` + `session-file-store` in **both** dev and prod (`./data/sessions`) — prod needs persistent volume on `./data` or sessions lost on redeploy. Cookie `secure` on only in prod. Passport Google OAuth restricts login to `@symphony.is` emails. Driver role env-var-driven (`DRIVER_EMAILS`); manager role same (`MANAGER_EMAILS`). Both flags (`isDriver`/`isManager`) live on session user, set at login — **changing env emails needs re-login to take effect** (old sessions keep old flags).
 
-**Socket.io auth**: every socket must carry an authenticated session (rejected via `io.use` otherwise). Driver-only events (`joinDriverInbox`, `driverLocation`, `driverStopSharing`) require `socket.data.user.isDriver`. `joinTour`/location events validate `tourId ∈ TOURS`. Client `leaveRoom` is handled server-side. `driverLocation`/`driverLocationStopped` payloads carry `tourId` (+ `name`/`departureTime`) so the map auto-identifies the active ride; `lat`/`lng` are validated with `Number.isFinite` before storing/broadcasting. `sendMessage`'s `userName` is taken from the server-side session (`socket.data.user.displayName`), never trusted from the client payload (was spoofable). A driver's GPS share is pinned to the tour active when sharing started (client tracks this in `sharingTourId`, independent of later dropdown changes) — `driverSocketByTour` (tourId → socket.id) lets the server clear `driverLocations[tourId]` on `disconnect` if a driver closes the tab/loses signal mid-share without clicking Stop, preventing a stale "ghost bus" marker.
+**Socket.io auth**: every socket needs authed session (rejected via `io.use` else). Driver-only events (`joinDriverInbox`, `driverLocation`, `driverStopSharing`) need `socket.data.user.isDriver`. `joinTour`/location events validate `tourId ∈ TOURS`. Client `leaveRoom` handled server-side. `driverLocation`/`driverLocationStopped` payloads carry `tourId` (+ `name`/`departureTime`) so map auto-IDs active ride; `lat`/`lng` validated `Number.isFinite` before store/broadcast. `sendMessage`'s `userName` taken from server-side session (`socket.data.user.displayName`), never trusted from client payload (was spoofable). Driver's GPS share pinned to tour active when sharing started (client tracks via `sharingTourId`, independent of later dropdown changes) — `driverSocketByTour` (tourId → socket.id) lets server clear `driverLocations[tourId]` on `disconnect` if driver closes tab/loses signal mid-share w/o clicking Stop, prevents stale "ghost bus" marker.
 
-**Database** (`db.js` + `data/db.json`): Flat JSON file, **git-ignored** (was previously committed with real data). Seeded from `data/db.example.json`, auto-created on boot if missing. Writes are atomic (tmp file + rename). No ORM, no migrations. Schema: `{ reservations: {tourId: {seatNumber: {userId, userName, stop, guest?, reservedAt}}}, pushSubscriptions: [], messages: [] }` (`guest:true` on manager-booked seats). Expired push subs (404/410) pruned by the 15:00 cron.
+**Database** (`db.js` + `data/db.json`): Flat JSON file, **git-ignored** (prev committed w/ real data). Seeded from `data/db.example.json`, auto-created on boot if missing. Writes atomic (tmp file + rename). No ORM, no migrations. Schema: `{ reservations: {tourId: {seatNumber: {userId, userName, stop, guest?, reservedAt}}}, pushSubscriptions: [], messages: [] }` (`guest:true` on manager-booked seats). Expired push subs (404/410) pruned by 15:00 cron.
 
 **Routes**:
-- `routes/api.js`: REST endpoints under `/api` — tours list, reserve/cancel, driver passenger list, public passenger manifest, push subscriptions, manual reset. `GET /tours/:tourId/passengers` (any authed user) and driver-only `GET /driver/passengers/:tourId` share `buildManifest()` (names grouped by stop, route order; exposes only userName/seat/stop/guest). Mutating endpoints (`reserve`, cancel, `push/subscribe`, `driver/reset`) are behind a per-IP `express-rate-limit` (60/min). Plus `GET /health` in `server.js` for Railway healthchecks.
+- `routes/api.js`: REST endpoints under `/api` — tours list, reserve/cancel, driver passenger list, public passenger manifest, push subs, manual reset. `GET /tours/:tourId/passengers` (any authed user) + driver-only `GET /driver/passengers/:tourId` share `buildManifest()` (names grouped by stop, route order; exposes only userName/seat/stop/guest). Mutating endpoints (`reserve`, cancel, `push/subscribe`, `driver/reset`) behind per-IP `express-rate-limit` (60/min). Plus `GET /health` in `server.js` for Railway healthchecks.
 - `routes/tours.js`: Static `TOURS` config object + `TOTAL_SEATS=19`. All tour data (stops, times, direction) lives here.
 - Auth routes inline in `server.js`: `/auth/google`, `/auth/google/callback`, `/auth/logout`, `/auth/user`
 
-**Frontend** (`public/`): Single-page app, no bundler. `public/js/app.js` is one large file with all UI logic. Tabs: tours, map (Leaflet + OpenStreetMap), chat, driver panel (hidden for non-drivers). Map tab has **no tour selector**: it shows an empty state (`#mapEmpty`) until a driver shares location, then reveals the map with a `#mapActiveTour` overlay naming the live ride (driven by `driverLocation`/`driverLocationStopped`). The map only auto-centers on the bus marker once per "reveal" (`mapCenteredOnReveal` flag, reset on `driverLocationStopped`) — recenter is gated on `#tab-map` actually being visible, since Leaflet computes wrong bounds against a hidden (0×0) container; after that first center it never fights a manual pan/zoom. Tours tab also has a "Ko putuje" manifest (tour selector → colleague names by station, route order, live via `seatUpdate`/`reservationsReset`). State is module-level vars. Socket.io for real-time seat updates, GPS location sharing, and chat. Driver chat alert plays `public/sounds/driver-alert.mp3` (falls back to a synthesized tone if missing/blocked by autoplay policy). Responsive tablet breakpoint at `min-width:768px` (driver uses a tablet); `min-width:700px` reflows the driver split.
+**Frontend** (`public/`): Single-page app, no bundler. `public/js/app.js` one big file, all UI logic. Tabs: tours, map (Leaflet + OpenStreetMap), chat, driver panel (hidden non-drivers). Map tab has **no tour selector**: shows empty state (`#mapEmpty`) til driver shares location, then reveals map w/ `#mapActiveTour` overlay naming live ride (driven by `driverLocation`/`driverLocationStopped`). Map auto-centers on bus marker only once per "reveal" (`mapCenteredOnReveal` flag, reset on `driverLocationStopped`) — recenter gated on `#tab-map` actually visible, since Leaflet computes wrong bounds against hidden (0×0) container; after first center never fights manual pan/zoom. Tours tab also has "Ko putuje" manifest (tour selector → colleague names by station, route order, live via `seatUpdate`/`reservationsReset`). State module-level vars. Socket.io for real-time seat updates, GPS share, chat. Driver chat alert plays `public/sounds/driver-alert.mp3` (falls back to synthesized tone if missing/blocked by autoplay policy). Responsive tablet breakpoint at `min-width:768px` (driver uses tablet); `min-width:700px` reflows driver split.
 
-**Cron jobs** (in `server.js`): two reservation-reset crons split by direction, each firing after that direction's tours have departed (Europe/Sarajevo) — morning (`morning1`/`morning2`) at 10:00, afternoon (`afternoon1`/`afternoon2`) at 18:30; both call `db.resetReservationsForTours(tourIds)` and emit `reservationsReset`. A single wholesale 11:00 wipe used to delete same-day afternoon bookings made before 11:00 (afternoon tours depart 16:20/17:30, after 11:00) — fixed by scoping each cron to its own direction group. `db.resetAllReservations()` still exists, used only by the manual driver-only `POST /api/driver/reset` (full immediate wipe, unchanged). Push notifications still sent at 15:00.
+**Cron jobs** (in `server.js`): two reservation-reset crons split by direction, each firing after that direction's tours departed (Europe/Sarajevo) — morning (`morning1`/`morning2`) at 10:00, afternoon (`afternoon1`/`afternoon2`) at 18:30; both call `db.resetReservationsForTours(tourIds)`, emit `reservationsReset`. Single wholesale 11:00 wipe used to delete same-day afternoon bookings made before 11:00 (afternoon tours depart 16:20/17:30, after 11:00) — fixed scoping each cron to own direction group. `db.resetAllReservations()` still exists, used only by manual driver-only `POST /api/driver/reset` (full immediate wipe, unchanged). Push notifs still sent 15:00.
 
-Note: the FE "today vs tomorrow" label cutoff (`public/js/app.js` `getRideDate()`/`defaultManifestTourId()`) still flips at 11:00 — now cosmetically out of sync with the 10:00/18:30 backend reset times (label logic untouched, separate concern).
+Note: FE "today vs tomorrow" label cutoff (`public/js/app.js` `getRideDate()`/`defaultManifestTourId()`) still flips at 11:00 — now cosmetically out of sync w/ 10:00/18:30 backend reset times (label logic untouched, separate concern).
 
-**Concurrency guard**: `reservationLocks` (in-memory Set) prevents double-booking on the same seat — not durable across restarts.
+**Concurrency guard**: `reservationLocks` (in-memory Set) stops double-booking same seat — not durable across restarts.
 
-## Key business rules
+## Key biz rules
 
-- 1 reservation per user per morning group (`morning1`/`morning2`) and 1 per afternoon group (`afternoon1`/`afternoon2`). **Managers (`isManager`) bypass this** — they book multiple seats (one DELETE per seat) for guests who can't log in; each such seat is flagged `guest:true` and shown as ★/Gost in grid + manifests. Cap is unchanged: distinct seats per tour ≤ `TOTAL_SEATS` (seats are unique 1..19).
-- `toOffice` tours (morning1/2) share the same stops; `fromOffice` tours (afternoon1/2) have **different** stops. All stop logic is per-tour (`TOURS[tourId].stops`) — never hardcode a stop list.
-- A station must be chosen before reserving (no auto-selected first stop; reserve button disabled until chosen; BE still 400s on empty/invalid stop)
-- Drivers like a chat message by double-tapping it (≤350ms), not by clicking the heart; heart is a visual indicator only. Like toggle stays driver-only (server-gated)
-- Drivers can cancel any reservation; users (incl. managers) can only cancel their own bookings (a manager owns their guest seats)
-- `isDriver` flag on the session user object gates driver endpoints (`ensureDriver` middleware); `isManager` is checked inline in `POST /api/reserve` (no dedicated middleware)
-- Chat is always global (no per-tour chat)
-- Push notification at 15:00 only fires if VAPID keys are configured and don't contain placeholder text
+- 1 reservation per user per morning group (`morning1`/`morning2`) + 1 per afternoon group (`afternoon1`/`afternoon2`). **Managers (`isManager`) bypass this** — book multiple seats (one DELETE per seat) for guests who can't log in; each such seat flagged `guest:true`, shown ★/Gost in grid + manifests. Cap unchanged: distinct seats per tour ≤ `TOTAL_SEATS` (seats unique 1..19).
+- `toOffice` tours (morning1/2) share same stops; `fromOffice` tours (afternoon1/2) have **different** stops. All stop logic per-tour (`TOURS[tourId].stops`) — never hardcode stop list.
+- Station must be chosen before reserve (no auto-selected first stop; reserve button disabled til chosen; BE still 400s on empty/invalid stop)
+- Drivers like chat msg by double-tap (≤350ms), not click heart; heart visual indicator only. Like toggle stays driver-only (server-gated)
+- Drivers cancel any reservation; users (incl managers) only cancel own bookings (manager owns their guest seats)
+- `isDriver` flag on session user object gates driver endpoints (`ensureDriver` middleware); `isManager` checked inline in `POST /api/reserve` (no dedicated middleware)
+- Chat always global (no per-tour chat)
+- Push notif at 15:00 only fires if VAPID keys configured + no placeholder text
 
 ## Workflow rules
 
-- **Playwright**: when used for manual testing/verification, Claude must manage the dev server lifecycle itself — start it before, stop it (`npm run stop`) and quit Chrome after, every run, no leftovers. Always launch Playwright with a default mobile viewport size (this is a mobile-first app).
-- **Google OAuth**: when using Playwright for testing, click on button to sign in with Google on my behalf, session is saved on-device (Chrome) so you will get logged on with one click - and be ready for testing.
-- **Definition of done**: before declaring any task complete, run `npm run lint` and `npm run format`, fix any reported issues, and re-run until both pass clean. A task is not done if linting/formatting fails.
+- **Playwright**: when used for manual test/verify, Claude must manage dev server lifecycle itself — start before, stop (`npm run stop`) + quit Chrome after, every run, no leftovers. Always launch Playwright w/ default mobile viewport size (mobile-first app).
+- **Google OAuth**: when using Playwright for testing, click sign-in-with-Google button on my behalf, session saved on-device (Chrome) so you get logged on one click — ready for testing.
+- **Definition of done**: before declaring task complete, run `npm run lint` + `npm run format`, fix reported issues, re-run til both pass clean. Task not done if lint/format fails.
 
 ## AI Docs Rules
 
-- Always update this @CLAUDE.md file if there are significant changes like:
-  - Something new added that is worth mentioning for AI assistants in future sessions
-  - Something significant changed in current state that is worth removing or updating for future sessions
-  - Keep the file always clean, short and understandable
+- Always update this @CLAUDE.md file if significant changes like:
+  - Something new added worth mentioning for AI assistants future sessions
+  - Something significant changed in current state worth removing/updating for future sessions
+  - Keep file clean, short, understandable
 
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
 
 ## Golden Rule
 
-**Always prefix commands with `rtk`**. If RTK has a dedicated filter, it uses it. If not, it passes through unchanged. This means RTK is always safe to use.
+**Always prefix commands w/ `rtk`**. If RTK has dedicated filter, uses it. If not, passes through unchanged. RTK always safe to use.
 
-**Important**: Even in command chains with `&&`, use `rtk`:
+**Important**: even in command chains w/ `&&`, use `rtk`:
 ```bash
 # ❌ Wrong
 git add . && git commit -m "msg" && git push
@@ -138,7 +138,7 @@ rtk git stash           # Compact stash
 rtk git worktree        # Compact worktree
 ```
 
-Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
+Note: Git passthrough works ALL subcommands, even unlisted.
 
 ### GitHub (26-87% savings)
 ```bash
@@ -216,5 +216,5 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 | Infrastructure   | docker, kubectl                | 85%             |
 | Network          | curl, wget                     | 65-70%          |
 
-Overall average: **60-90% token reduction** on common development operations.
+Overall avg: **60-90% token reduction** on common dev ops.
 <!-- /rtk-instructions -->
