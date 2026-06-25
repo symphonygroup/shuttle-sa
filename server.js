@@ -29,7 +29,8 @@ const isProd = process.env.NODE_ENV === 'production';
     fs.writeFileSync(probe, String(Date.now()));
     fs.unlinkSync(probe);
     console.log(`[startup] data dir writable: ${dataDir}`);
-    if (isProd) console.log('[startup] prod: ensure ./data is a persistent Railway volume (see CLAUDE.md)');
+    if (isProd)
+      console.log('[startup] prod: ensure ./data is a persistent Railway volume (see CLAUDE.md)');
   } catch (err) {
     const msg = `data dir NOT writable: ${dataDir} (${err.message})`;
     if (isProd) throw new Error(`[startup] ${msg} — mount a persistent volume on ./data`);
