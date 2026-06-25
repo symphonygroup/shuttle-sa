@@ -12,10 +12,18 @@ const webpush = require('web-push');
 const path = require('node:path');
 const db = require('./db');
 const { TOURS } = require('./routes/tours');
+const { sarajevoDate, rideId, parseRideId } = require('./rides');
 const apiRouter = require('./routes/api');
 const { ensureAuthenticated } = require('./middleware/auth');
 
 const isProd = process.env.NODE_ENV === 'production';
+
+// Boot: migrate any pre-date-window reservations to today, then drop stale past dates.
+(() => {
+  const today = sarajevoDate();
+  db.migrateLegacyReservations(today, Object.keys(TOURS));
+  db.purgePastDates(today);
+})();
 
 // Fail fast in production if critical secrets are missing; warn in dev.
 (() => {
@@ -192,8 +200,8 @@ app.get('/', ensureAuthenticated, (_req, res) => {
 });
 
 // Socket.io
-const driverLocations = {};
-const driverSocketByTour = {}; // tourId -> socket.id currently sharing, for disconnect cleanup
+const driverLocations = {}; // rideId -> live location payload
+const driverSocketByRide = {}; // rideId -> socket.id currently sharing, for disconnect cleanup
 const MAX_MSG_LEN = 500;
 
 // Attach session, then require an authenticated user for every socket.
@@ -210,18 +218,19 @@ io.use((socket, next) => {
 io.on('connection', socket => {
   const user = socket.data.user;
 
-  // Join tour room (location tracking only)
-  socket.on('joinTour', tourId => {
-    if (!TOURS[tourId]) return;
-    socket.join(tourId);
-    if (driverLocations[tourId]) {
-      socket.emit('driverLocation', driverLocations[tourId]);
+  // Join ride room (rideId = `${tourId}__${date}`, location tracking only)
+  socket.on('joinTour', id => {
+    const { tourId, date } = parseRideId(id);
+    if (!TOURS[tourId] || !date) return;
+    socket.join(id);
+    if (driverLocations[id]) {
+      socket.emit('driverLocation', driverLocations[id]);
     }
   });
 
-  // Leave a tour room (client switches tour on the map)
-  socket.on('leaveRoom', tourId => {
-    if (typeof tourId === 'string') socket.leave(tourId);
+  // Leave a ride room (client switches ride on the map)
+  socket.on('leaveRoom', id => {
+    if (typeof id === 'string') socket.leave(id);
   });
 
   // Join global message channel
@@ -236,39 +245,44 @@ io.on('connection', socket => {
     socket.join('driver-inbox');
   });
 
-  // Driver shares location (drivers only)
+  // Driver shares location (drivers only). Not gated on the active-window cutoff so a
+  // ride in progress past its cutoff keeps streaming GPS instead of freezing.
   socket.on('driverLocation', data => {
     if (!user.isDriver) return;
-    const { tourId, lat, lng } = data || {};
-    if (!TOURS[tourId] || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    driverLocations[tourId] = {
+    const { tourId, date, lat, lng } = data || {};
+    if (!TOURS[tourId] || !date || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const id = rideId(tourId, date);
+    driverLocations[id] = {
       tourId,
+      date,
       name: TOURS[tourId].name,
       departureTime: TOURS[tourId].departureTime,
       lat,
       lng,
       timestamp: Date.now()
     };
-    driverSocketByTour[tourId] = socket.id;
-    io.to(tourId).emit('driverLocation', driverLocations[tourId]);
+    driverSocketByRide[id] = socket.id;
+    io.to(id).emit('driverLocation', driverLocations[id]);
   });
 
   // Stop sharing location (drivers only)
-  socket.on('driverStopSharing', tourId => {
-    if (!user.isDriver || !TOURS[tourId]) return;
-    delete driverLocations[tourId];
-    if (driverSocketByTour[tourId] === socket.id) delete driverSocketByTour[tourId];
-    io.to(tourId).emit('driverLocationStopped', { tourId });
+  socket.on('driverStopSharing', id => {
+    const { tourId, date } = parseRideId(id);
+    if (!user.isDriver || !TOURS[tourId] || !date) return;
+    delete driverLocations[id];
+    if (driverSocketByRide[id] === socket.id) delete driverSocketByRide[id];
+    io.to(id).emit('driverLocationStopped', { tourId, date });
   });
 
   // Driver disconnected (tab closed, network loss) without clicking Stop —
-  // clear any tour this socket was actively sharing so riders don't see a frozen ghost bus.
+  // clear any ride this socket was actively sharing so riders don't see a frozen ghost bus.
   socket.on('disconnect', () => {
-    for (const [tourId, sharerId] of Object.entries(driverSocketByTour)) {
+    for (const [id, sharerId] of Object.entries(driverSocketByRide)) {
       if (sharerId === socket.id) {
-        delete driverLocations[tourId];
-        delete driverSocketByTour[tourId];
-        io.to(tourId).emit('driverLocationStopped', { tourId });
+        const { tourId, date } = parseRideId(id);
+        delete driverLocations[id];
+        delete driverSocketByRide[id];
+        io.to(id).emit('driverLocationStopped', { tourId, date });
       }
     }
   });
@@ -291,24 +305,36 @@ io.on('connection', socket => {
   });
 });
 
-// Cron: Reset morning reservations at 10:00 (after morning1/2 last departure 08:40)
+// Cron: Retire today's morning rides at 10:00 (after morning1/2 last departure 08:40).
+// Tomorrow's morning (separate date key) is untouched and becomes the new "today".
 cron.schedule(
   '0 10 * * *',
   () => {
-    db.resetReservationsForTours(['morning1', 'morning2']);
+    db.resetReservationsForTours(sarajevoDate(), ['morning1', 'morning2']);
     io.emit('reservationsReset');
-    console.log('Morning reservations reset at 10:00');
+    console.log('Morning rides retired at 10:00');
   },
   { timezone: 'Europe/Sarajevo' }
 );
 
-// Cron: Reset afternoon reservations at 18:30 (after afternoon1/2 last departure 17:30)
+// Cron: Retire today's afternoon rides at 18:30 (after afternoon1/2 last departure 17:30).
 cron.schedule(
   '30 18 * * *',
   () => {
-    db.resetReservationsForTours(['afternoon1', 'afternoon2']);
+    db.resetReservationsForTours(sarajevoDate(), ['afternoon1', 'afternoon2']);
     io.emit('reservationsReset');
-    console.log('Afternoon reservations reset at 18:30');
+    console.log('Afternoon rides retired at 18:30');
+  },
+  { timezone: 'Europe/Sarajevo' }
+);
+
+// Cron: Calendar rollover at midnight — purge past-date reservations, refresh clients.
+cron.schedule(
+  '0 0 * * *',
+  () => {
+    db.purgePastDates(sarajevoDate());
+    io.emit('reservationsReset');
+    console.log('Past-date reservations purged at 00:00');
   },
   { timezone: 'Europe/Sarajevo' }
 );
