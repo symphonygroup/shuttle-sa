@@ -58,6 +58,10 @@ Note: today/tomorrow is now real (per-date seat pools), no longer a cosmetic 11:
 
 **Concurrency guard**: `reservationLocks` (in-memory Set) stops double-booking same seat — not durable across restarts.
 
+**Scaling ceiling — SINGLE INSTANCE ONLY** (`numReplicas: 1`, set in Railway dashboard; default is 1). `driverLocations`/`driverSocketByRide`/`reservationLocks` are in-memory module state, Socket.io rooms have no Redis adapter, DB is a local file, and crons run in-process. With >1 replica: seat double-booking (locks not shared), GPS/seat/chat updates only reach clients on the same instance, crons fire once **per** replica (duplicate push), and two instances on separate volumes diverge. Horizontal scaling would require Postgres/Redis + `@socket.io/redis-adapter` + externalized session store and locks — out of current scope.
+
+**Deploy/ops**: `railway.json` (repo root) pins `startCommand: npm start`, `healthcheckPath: /health`, `restartPolicyType: ON_FAILURE`. **Volume + replicas=1 are NOT declarable in `railway.json`** (Railway schema) — set them in the dashboard: persistent Volume mounted at `<service>/data` (else every redeploy wipes sessions + `db.json` + push subs), replicas=1. Boot fails fast in prod if `./data` not writable (`server.js`). Graceful shutdown on SIGTERM/SIGINT closes Socket.io + HTTP before exit; `uncaughtException`/`unhandledRejection` log then `exit(1)` (Railway restarts clean, no zombie).
+
 ## Key biz rules
 
 - 1 reservation per user per morning group (`morning1`/`morning2`) + 1 per afternoon group (`afternoon1`/`afternoon2`), **scoped per date** (user may hold today-morning AND tomorrow-morning, but not two in the same day's morning group). **Managers (`isManager`) bypass this** — book multiple seats (one DELETE per seat) for guests who can't log in; each such seat flagged `guest:true`, shown ★/Gost in grid + manifests. Cap unchanged: distinct seats per dated ride ≤ `TOTAL_SEATS` (seats unique 1..19).

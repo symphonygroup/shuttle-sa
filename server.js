@@ -10,6 +10,7 @@ const helmet = require('helmet');
 const cron = require('node-cron');
 const webpush = require('web-push');
 const path = require('node:path');
+const fs = require('node:fs');
 const db = require('./db');
 const { TOURS } = require('./routes/tours');
 const { sarajevoDate, rideId, parseRideId } = require('./rides');
@@ -17,6 +18,24 @@ const apiRouter = require('./routes/api');
 const { ensureAuthenticated } = require('./middleware/auth');
 
 const isProd = process.env.NODE_ENV === 'production';
+
+// Boot: ./data must be writable (holds sessions + db.json + backups). In prod it MUST be a
+// persistent volume — without one, every redeploy wipes all data. Fail loud if not writable.
+(() => {
+  const dataDir = path.join(__dirname, 'data');
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    const probe = path.join(dataDir, '.write-probe');
+    fs.writeFileSync(probe, String(Date.now()));
+    fs.unlinkSync(probe);
+    console.log(`[startup] data dir writable: ${dataDir}`);
+    if (isProd) console.log('[startup] prod: ensure ./data is a persistent Railway volume (see CLAUDE.md)');
+  } catch (err) {
+    const msg = `data dir NOT writable: ${dataDir} (${err.message})`;
+    if (isProd) throw new Error(`[startup] ${msg} — mount a persistent volume on ./data`);
+    console.warn(`[startup] ${msg}`);
+  }
+})();
 
 // Boot: migrate any pre-date-window reservations to today, then drop stale past dates.
 (() => {
@@ -374,10 +393,39 @@ cron.schedule(
   { timezone: 'Europe/Sarajevo' }
 );
 
-process.on('unhandledRejection', err => console.error('Unhandled rejection:', err));
-process.on('uncaughtException', err => console.error('Uncaught exception:', err));
+// Process is in an undefined state after these — log then exit so Railway restarts clean
+// instead of a zombie continuing to serve.
+process.on('unhandledRejection', err => {
+  console.error('Unhandled rejection:', err);
+  process.exit(1);
+});
+process.on('uncaughtException', err => {
+  console.error('Uncaught exception:', err);
+  process.exit(1);
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Symphony Shuttle running on http://localhost:${PORT}`);
 });
+
+// Graceful shutdown: Railway sends SIGTERM on every redeploy. Close sockets + HTTP server
+// so in-flight requests finish and no db write is interrupted mid read-modify-write.
+let shuttingDown = false;
+function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received, shutting down...`);
+  io.close();
+  server.close(() => {
+    console.log('Server closed, exiting');
+    process.exit(0);
+  });
+  // Don't hang forever if a connection refuses to close.
+  setTimeout(() => {
+    console.error('Forced exit after shutdown timeout');
+    process.exit(1);
+  }, 10000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
