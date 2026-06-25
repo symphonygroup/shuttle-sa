@@ -24,22 +24,24 @@ function writeDB(data) {
   fs.renameSync(tmp, DB_PATH);
 }
 
-function getReservationsForTour(tourId) {
+// Reservations are keyed reservations[date][tourId][seat], date = YYYY-MM-DD (Sarajevo).
+function getReservationsForRide(date, tourId) {
   const db = readDB();
-  return db.reservations[tourId] || {};
+  return db.reservations[date]?.[tourId] || {};
 }
 
-function reserve(tourId, seatNumber, data) {
+function reserve(date, tourId, seatNumber, data) {
   const db = readDB();
-  if (!db.reservations[tourId]) db.reservations[tourId] = {};
-  db.reservations[tourId][seatNumber] = data;
+  if (!db.reservations[date]) db.reservations[date] = {};
+  if (!db.reservations[date][tourId]) db.reservations[date][tourId] = {};
+  db.reservations[date][tourId][seatNumber] = data;
   writeDB(db);
 }
 
-function cancelReservation(tourId, seatNumber) {
+function cancelReservation(date, tourId, seatNumber) {
   const db = readDB();
-  if (db.reservations[tourId]) {
-    delete db.reservations[tourId][seatNumber];
+  if (db.reservations[date]?.[tourId]) {
+    delete db.reservations[date][tourId][seatNumber];
     writeDB(db);
   }
 }
@@ -50,9 +52,37 @@ function resetAllReservations() {
   writeDB(db);
 }
 
-function resetReservationsForTours(tourIds) {
+function resetReservationsForTours(date, tourIds) {
   const db = readDB();
-  for (const id of tourIds) delete db.reservations[id];
+  if (!db.reservations[date]) return;
+  for (const id of tourIds) delete db.reservations[date][id];
+  writeDB(db);
+}
+
+// Drop reservations for any date strictly before `today` (YYYY-MM-DD lexical compare).
+function purgePastDates(today) {
+  const db = readDB();
+  let changed = false;
+  for (const date of Object.keys(db.reservations)) {
+    if (date < today) {
+      delete db.reservations[date];
+      changed = true;
+    }
+  }
+  if (changed) writeDB(db);
+}
+
+// One-time migration: pre-date-window data was reservations[tourId][seat]. Move any
+// top-level tourId key under reservations[today][tourId] so in-flight bookings survive.
+function migrateLegacyReservations(today, tourIds) {
+  const db = readDB();
+  const legacy = Object.keys(db.reservations).filter(k => tourIds.includes(k));
+  if (!legacy.length) return;
+  if (!db.reservations[today]) db.reservations[today] = {};
+  for (const id of legacy) {
+    db.reservations[today][id] = { ...(db.reservations[today][id] || {}), ...db.reservations[id] };
+    delete db.reservations[id];
+  }
   writeDB(db);
 }
 
@@ -105,11 +135,13 @@ function getMessages(tourId) {
 }
 
 module.exports = {
-  getReservationsForTour,
+  getReservationsForRide,
   reserve,
   cancelReservation,
   resetAllReservations,
   resetReservationsForTours,
+  purgePastDates,
+  migrateLegacyReservations,
   addPushSubscription,
   getAllPushSubscriptions,
   removePushSubscription,
