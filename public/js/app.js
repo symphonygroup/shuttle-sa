@@ -61,6 +61,25 @@ const TOTAL_SEATS = 19;
 })();
 
 // ── Socket ─────────────────────────────────────────────────────────────────
+
+// Refetch the whole window + reopen panels. Called on reservationsReset (rides may have
+// rolled over) and on reconnect (events missed during the drop). No toast — caller decides.
+async function reconcileState() {
+  await loadTours();
+  buildManifestOptions();
+  if (currentUser?.isDriver) buildDriverOptions();
+  if (manifestRideId) loadManifest(manifestRideId);
+  if (currentUser?.isDriver && activeDriverTourId) loadPassengers(activeDriverTourId);
+  const openRide = activeTour && tours.find(t => t.id === activeTour.id);
+  if (activeTour && !openRide) {
+    closeModal();
+  } else if (openRide) {
+    activeTour = openRide;
+    renderSeatGrid(openRide);
+    updateModalPanels(openRide);
+  }
+}
+
 function initSocket() {
   socket = io();
 
@@ -72,13 +91,15 @@ function initSocket() {
     document.getElementById('connBanner').classList.add('hidden');
   });
 
-  // Re-join rooms after a dropped connection is restored
+  // Re-join rooms after a dropped connection is restored, then reconcile state —
+  // any seatUpdate/reservationsReset emitted during the drop was missed, so refetch.
   socket.io.on('reconnect', () => {
     tours.forEach(t => {
       socket.emit('joinTour', t.id);
     });
     socket.emit('joinGlobal');
     if (currentUser?.isDriver) socket.emit('joinDriverInbox');
+    reconcileState();
   });
 
   socket.on('seatUpdate', ({ tourId, date, seatNumber, status, userName, guest }) => {
@@ -116,20 +137,7 @@ function initSocket() {
   });
 
   socket.on('reservationsReset', async () => {
-    // Refetch the whole window — rides may have rolled over (retired today / new tomorrow).
-    await loadTours();
-    buildManifestOptions();
-    if (currentUser?.isDriver) buildDriverOptions();
-    if (manifestRideId) loadManifest(manifestRideId);
-    if (currentUser?.isDriver && activeDriverTourId) loadPassengers(activeDriverTourId);
-    const openRide = activeTour && tours.find(t => t.id === activeTour.id);
-    if (activeTour && !openRide) {
-      closeModal();
-    } else if (openRide) {
-      activeTour = openRide;
-      renderSeatGrid(openRide);
-      updateModalPanels(openRide);
-    }
+    await reconcileState();
     showToast('Rezervacije su resetovane 🔄');
   });
 
