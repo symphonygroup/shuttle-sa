@@ -9,9 +9,9 @@ let map = null;
 let busMarker = null;
 let mapCenteredOnReveal = false;
 let driverWatchId = null;
-let activeDriverTourId = null;
-let sharingTourId = null; // tour the live GPS share is actually pinned to (may differ from the dropdown)
-let manifestTourId = null;
+let activeDriverTourId = null; // rideId of the driver's selected ride
+let sharingTourId = null; // rideId the live GPS share is pinned to (may differ from the dropdown)
+let manifestRideId = null;
 
 const TOTAL_SEATS = 19;
 
@@ -81,9 +81,10 @@ function initSocket() {
     if (currentUser?.isDriver) socket.emit('joinDriverInbox');
   });
 
-  socket.on('seatUpdate', ({ tourId, seatNumber, status, userName, guest }) => {
-    const tour = tours.find(t => t.id === tourId);
+  socket.on('seatUpdate', ({ tourId, date, seatNumber, status, userName, guest }) => {
+    const tour = tours.find(t => t.tourId === tourId && t.date === date);
     if (!tour) return;
+    const rid = tour.id;
     if (status === 'free') {
       delete tour.seats[seatNumber];
       if (tour.seatNames) delete tour.seatNames[seatNumber];
@@ -104,31 +105,31 @@ function initSocket() {
       else delete tour.seatGuests[seatNumber];
     }
     renderTourCard(tour);
-    if (activeTour && activeTour.id === tourId) {
+    if (activeTour && activeTour.id === rid) {
       renderSeatGrid(tour);
       updateModalPanels(tour);
     }
-    if (currentUser?.isDriver && activeDriverTourId === tourId) {
-      loadPassengers(tourId);
+    if (currentUser?.isDriver && activeDriverTourId === rid) {
+      loadPassengers(rid);
     }
-    if (manifestTourId === tourId) loadManifest(tourId);
+    if (manifestRideId === rid) loadManifest(rid);
   });
 
-  socket.on('reservationsReset', () => {
-    tours.forEach(t => {
-      t.seats = {};
-      t.myReservation = null;
-      t.takenCount = 0;
-    });
-    tours.forEach(renderTourCard);
-    if (activeTour) {
-      renderSeatGrid(activeTour);
-      updateModalPanels(activeTour);
+  socket.on('reservationsReset', async () => {
+    // Refetch the whole window — rides may have rolled over (retired today / new tomorrow).
+    await loadTours();
+    buildManifestOptions();
+    if (currentUser?.isDriver) buildDriverOptions();
+    if (manifestRideId) loadManifest(manifestRideId);
+    if (currentUser?.isDriver && activeDriverTourId) loadPassengers(activeDriverTourId);
+    const openRide = activeTour && tours.find(t => t.id === activeTour.id);
+    if (activeTour && !openRide) {
+      closeModal();
+    } else if (openRide) {
+      activeTour = openRide;
+      renderSeatGrid(openRide);
+      updateModalPanels(openRide);
     }
-    if (currentUser?.isDriver && activeDriverTourId) {
-      loadPassengers(activeDriverTourId);
-    }
-    if (manifestTourId) loadManifest(manifestTourId);
     showToast('Rezervacije su resetovane 🔄');
   });
 
@@ -241,43 +242,6 @@ function initTabs() {
 }
 
 // ── Tours ──────────────────────────────────────────────────────────────────
-function getRideDate() {
-  const MONTHS = [
-    'januar',
-    'februar',
-    'mart',
-    'april',
-    'maj',
-    'juni',
-    'juli',
-    'august',
-    'septembar',
-    'oktobar',
-    'novembar',
-    'decembar'
-  ];
-  const now = new Date();
-  const tz = 'Europe/Sarajevo';
-  const hourStr = new Intl.DateTimeFormat('en', {
-    hour: 'numeric',
-    hour12: false,
-    timeZone: tz
-  }).format(now);
-  const isTomorrow = parseInt(hourStr, 10) >= 11;
-  const target = new Date(now);
-  if (isTomorrow) target.setDate(target.getDate() + 1);
-  const parts = new Intl.DateTimeFormat('en', {
-    day: 'numeric',
-    month: 'numeric',
-    year: 'numeric',
-    timeZone: tz
-  }).formatToParts(target);
-  const day = parseInt(parts.find(p => p.type === 'day').value, 10);
-  const month = parseInt(parts.find(p => p.type === 'month').value, 10) - 1;
-  const year = parts.find(p => p.type === 'year').value;
-  return `${isTomorrow ? 'Sutra' : 'Danas'}, ${day}. ${MONTHS[month]} ${year}.`;
-}
-
 async function loadTours() {
   try {
     const res = await fetch('/api/tours');
@@ -288,28 +252,36 @@ async function loadTours() {
     showToast('❌ Greška pri učitavanju tura', 'error');
     return;
   }
-  document.getElementById('rideDateLabel').textContent = getRideDate();
   const grid = document.getElementById('toursGrid');
   grid.innerHTML = '';
-  const morning = tours.filter(t => t.direction === 'toOffice');
-  const afternoon = tours.filter(t => t.direction === 'fromOffice');
-  [
-    { label: 'Jutarnje ture', items: morning },
-    { label: 'Popodnevne ture', items: afternoon }
-  ].forEach(({ label, items }) => {
-    if (!items.length) return;
-    const h = document.createElement('div');
-    h.className = 'tour-group-label';
-    h.textContent = label;
-    grid.appendChild(h);
-    items.forEach(tour => {
-      const card = document.createElement('div');
-      card.className = 'tour-card';
-      card.id = `tour-card-${tour.id}`;
-      card.addEventListener('click', () => openModal(tour));
-      grid.appendChild(card);
-      renderTourCard(tour);
-      socket.emit('joinTour', tour.id);
+  // Two-day window: one section per service date (Danas then Sutra), each with
+  // its morning/afternoon groups. A ride's seat pool is unique per (date, tour).
+  const dates = [...new Set(tours.map(t => t.date))].sort();
+  dates.forEach(date => {
+    const dayRides = tours.filter(t => t.date === date);
+    if (!dayRides.length) return;
+    const dayHeader = document.createElement('div');
+    dayHeader.className = 'ride-date-label';
+    dayHeader.textContent = `${dayRides[0].dateLabel} · ${dayRides[0].displayDate}`;
+    grid.appendChild(dayHeader);
+    [
+      { label: 'Jutarnje ture', items: dayRides.filter(t => t.direction === 'toOffice') },
+      { label: 'Popodnevne ture', items: dayRides.filter(t => t.direction === 'fromOffice') }
+    ].forEach(({ label, items }) => {
+      if (!items.length) return;
+      const h = document.createElement('div');
+      h.className = 'tour-group-label';
+      h.textContent = label;
+      grid.appendChild(h);
+      items.forEach(tour => {
+        const card = document.createElement('div');
+        card.className = 'tour-card';
+        card.id = `tour-card-${tour.id}`;
+        card.addEventListener('click', () => openModal(tour));
+        grid.appendChild(card);
+        renderTourCard(tour);
+        socket.emit('joinTour', tour.id);
+      });
     });
   });
 }
@@ -334,70 +306,62 @@ function renderTourCard(tour) {
 }
 
 // ── Manifest (Ko putuje) ─────────────────────────────────────────────────────
-function nowMinutesSarajevo() {
-  const parts = new Intl.DateTimeFormat('en', {
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-    timeZone: 'Europe/Sarajevo'
-  }).formatToParts(new Date());
-  const h = parseInt(parts.find(p => p.type === 'hour').value, 10);
-  const m = parseInt(parts.find(p => p.type === 'minute').value, 10);
-  return h * 60 + m;
-}
-
 function depMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
 }
 
-function defaultManifestTourId() {
+function defaultManifestRideId() {
   if (!tours.length) return null;
-  // Same 11:00 cutoff as getRideDate(): after 11:00 the ride window is tomorrow,
-  // so every tour counts as upcoming; before 11:00 only tours not yet departed.
-  const afterCutoff = nowMinutesSarajevo() >= 11 * 60;
-  const upcoming = afterCutoff
-    ? tours.slice()
-    : tours.filter(t => depMinutes(t.departureTime) >= nowMinutesSarajevo());
-  const pool = upcoming.length ? upcoming : tours.slice();
-  const byTime = [...pool].sort(
-    (a, b) => depMinutes(a.departureTime) - depMinutes(b.departureTime)
+  const sorted = [...tours].sort((a, b) =>
+    a.date === b.date
+      ? depMinutes(a.departureTime) - depMinutes(b.departureTime)
+      : a.date.localeCompare(b.date)
   );
-  const mine = byTime.find(t => t.myReservation);
-  return (mine || byTime[0]).id;
+  const mine = sorted.find(t => t.myReservation);
+  return (mine || sorted[0]).id;
+}
+
+// Rebuild the manifest dropdown from the current ride window, keeping the
+// selection if it still exists, else falling back to the default ride.
+function buildManifestOptions() {
+  const sel = document.getElementById('manifestTourSelect');
+  if (!sel) return;
+  sel.innerHTML = '';
+  tours.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.name} · ${t.departureTime} · ${t.dateLabel}`;
+    sel.appendChild(opt);
+  });
+  if (!tours.find(t => t.id === manifestRideId)) manifestRideId = defaultManifestRideId();
+  if (manifestRideId) sel.value = manifestRideId;
 }
 
 function initManifest() {
   const sel = document.getElementById('manifestTourSelect');
   if (!sel) return;
-  tours.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    opt.textContent = `${t.name} · ${t.departureTime}`;
-    sel.appendChild(opt);
-  });
-  manifestTourId = defaultManifestTourId();
-  if (manifestTourId) {
-    sel.value = manifestTourId;
-    loadManifest(manifestTourId);
-  }
+  buildManifestOptions();
+  if (manifestRideId) loadManifest(manifestRideId);
   sel.addEventListener('change', () => {
-    manifestTourId = sel.value;
-    loadManifest(manifestTourId);
+    manifestRideId = sel.value;
+    loadManifest(manifestRideId);
   });
 }
 
-async function loadManifest(tourId) {
+async function loadManifest(rideId) {
+  const ride = tours.find(t => t.id === rideId);
+  if (!ride) return;
   let data;
   try {
-    const res = await fetch(`/api/tours/${tourId}/passengers`);
+    const res = await fetch(`/api/tours/${ride.tourId}/${ride.date}/passengers`);
     if (!res.ok) throw new Error('manifest request failed');
     data = await res.json();
   } catch (e) {
     console.error('loadManifest failed:', e);
     return;
   }
-  if (manifestTourId !== tourId) return; // selection changed while fetching
+  if (manifestRideId !== rideId) return; // selection changed while fetching
   renderManifest(data);
 }
 
@@ -442,7 +406,8 @@ function openModal(tour) {
   activeTour = tour;
   selectedSeat = null;
   pendingCancelSeat = null;
-  document.getElementById('modalTourName').textContent = `${tour.name} · ${tour.departureTime}`;
+  document.getElementById('modalTourName').textContent =
+    `${tour.name} · ${tour.departureTime} · ${tour.dateLabel}`;
   renderSeatGrid(tour);
   updateModalPanels(tour);
   document.getElementById('seatModal').classList.remove('hidden');
@@ -631,9 +596,11 @@ async function doReserve() {
     showToast('❌ Odaberi stanicu', 'error');
     return;
   }
-  // Capture the requested tour/seat — activeTour/selectedSeat can change while the
-  // request is in flight (modal closed/reopened on a different tour mid-request).
-  const tourId = activeTour.id;
+  // Capture the requested ride/seat — activeTour/selectedSeat can change while the
+  // request is in flight (modal closed/reopened on a different ride mid-request).
+  const rid = activeTour.id;
+  const tourId = activeTour.tourId;
+  const date = activeTour.date;
   const bookedSeat = selectedSeat;
   const btn = document.getElementById('reserveBtn');
   btn.disabled = true;
@@ -643,7 +610,7 @@ async function doReserve() {
     const res = await fetch('/api/reserve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tourId, seatNumber: bookedSeat, stop })
+      body: JSON.stringify({ tourId, date, seatNumber: bookedSeat, stop })
     });
     if (res.redirected || res.status === 401) {
       showToast('❌ Sesija istekla — prijavite se ponovo', 'error');
@@ -652,7 +619,7 @@ async function doReserve() {
     }
     const data = await res.json();
     if (data.success) {
-      const tour = tours.find(t => t.id === tourId);
+      const tour = tours.find(t => t.id === rid);
       if (tour) {
         tour.seats[bookedSeat] = 'mine';
         if (!tour.seatNames) tour.seatNames = {};
@@ -665,8 +632,8 @@ async function doReserve() {
           tour.myReservation = { seatNumber: bookedSeat, stop };
         }
         renderTourCard(tour);
-        // Only touch the modal/selection state if it's still showing this same tour.
-        if (activeTour?.id === tourId) {
+        // Only touch the modal/selection state if it's still showing this same ride.
+        if (activeTour?.id === rid) {
           if (currentUser.isManager) {
             selectedSeat = null;
             document.getElementById('stopSelector').classList.add('hidden');
@@ -692,12 +659,14 @@ async function doReserve() {
 async function doCancel() {
   const seatNumber = pendingCancelSeat ?? activeTour?.myReservation?.seatNumber;
   if (!activeTour || seatNumber == null) return;
-  // Capture the requested tour — activeTour can change while the request is in
-  // flight (modal closed/reopened on a different tour mid-request).
-  const tourId = activeTour.id;
+  // Capture the requested ride — activeTour can change while the request is in
+  // flight (modal closed/reopened on a different ride mid-request).
+  const rid = activeTour.id;
+  const tourId = activeTour.tourId;
+  const date = activeTour.date;
   let data;
   try {
-    const res = await fetch(`/api/reserve/${tourId}/${seatNumber}`, { method: 'DELETE' });
+    const res = await fetch(`/api/reserve/${tourId}/${date}/${seatNumber}`, { method: 'DELETE' });
     if (res.redirected || res.status === 401) {
       showToast('❌ Sesija istekla — prijavite se ponovo', 'error');
       setTimeout(() => (window.location.href = '/login'), 1500);
@@ -710,15 +679,15 @@ async function doCancel() {
     return;
   }
   if (data.success) {
-    const tour = tours.find(t => t.id === tourId);
+    const tour = tours.find(t => t.id === rid);
     if (tour) {
       delete tour.seats[seatNumber];
       if (tour.seatNames) delete tour.seatNames[seatNumber];
       if (tour.seatGuests) delete tour.seatGuests[seatNumber];
       if (tour.myReservation?.seatNumber === seatNumber) tour.myReservation = null;
       renderTourCard(tour);
-      // Only touch the modal/pending-cancel state if it's still showing this same tour.
-      if (activeTour?.id === tourId) {
+      // Only touch the modal/pending-cancel state if it's still showing this same ride.
+      if (activeTour?.id === rid) {
         pendingCancelSeat = null;
         activeTour = tour;
         renderSeatGrid(tour);
@@ -866,17 +835,34 @@ function playDing() {
 }
 
 // ── Driver Panel ───────────────────────────────────────────────────────────
+// Driver drives today only — list today's still-active rides, keep selection if valid.
+function buildDriverOptions() {
+  const sel = document.getElementById('driverTourSelect');
+  if (!sel) return;
+  const prev = activeDriverTourId;
+  sel.innerHTML = '<option value="">-- Odaberi turu --</option>';
+  tours
+    .filter(t => t.dateLabel === 'Danas')
+    .forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.name} · ${t.departureTime}`;
+      sel.appendChild(opt);
+    });
+  if (prev && tours.find(t => t.id === prev)) {
+    sel.value = prev;
+  } else {
+    activeDriverTourId = null;
+    sel.value = '';
+  }
+}
+
 function initDriverTourSelect() {
   if (!currentUser.isDriver) return;
   const sel = document.getElementById('driverTourSelect');
-  tours.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    opt.textContent = `${t.name} · ${t.departureTime}`;
-    sel.appendChild(opt);
-  });
+  buildDriverOptions();
   const startBtn = document.getElementById('startLocBtn');
-  startBtn.disabled = true;
+  startBtn.disabled = !activeDriverTourId;
   sel.addEventListener('change', () => {
     activeDriverTourId = sel.value;
     startBtn.disabled = !activeDriverTourId;
@@ -915,10 +901,12 @@ async function doDriverReset() {
   }
 }
 
-async function loadPassengers(tourId) {
+async function loadPassengers(rideId) {
+  const ride = tours.find(t => t.id === rideId);
+  if (!ride) return;
   let data;
   try {
-    const res = await fetch(`/api/driver/passengers/${tourId}`);
+    const res = await fetch(`/api/driver/passengers/${ride.tourId}/${ride.date}`);
     data = await res.json();
   } catch (e) {
     console.error('loadPassengers failed:', e);
@@ -967,14 +955,16 @@ function startSharingLocation() {
   document.getElementById('stopLocBtn').classList.remove('hidden');
 
   sharingTourId = activeDriverTourId;
-  const tourName = tours.find(t => t.id === sharingTourId)?.name || sharingTourId;
+  const ride = tours.find(t => t.id === sharingTourId);
+  const tourName = ride?.name || sharingTourId;
   document.getElementById('locStatus').innerHTML =
     `<span class="status-dot online"></span> Dijeljenje lokacije aktivno · ${escapeHtml(tourName)}`;
 
   driverWatchId = navigator.geolocation.watchPosition(
     pos => {
       socket.emit('driverLocation', {
-        tourId: sharingTourId,
+        tourId: ride.tourId,
+        date: ride.date,
         lat: pos.coords.latitude,
         lng: pos.coords.longitude
       });
