@@ -858,9 +858,9 @@ function playDingTone() {
 }
 
 function playDing() {
-  const audio = new Audio('/sounds/driver-alert.mp3');
+  const audio = new Audio('/sounds/driver-alert.wav');
   audio.play().catch(e => {
-    console.warn('driver-alert.mp3 playback failed, falling back to tone:', e);
+    console.warn('driver-alert.wav playback failed, falling back to tone:', e);
     playDingTone();
   });
 }
